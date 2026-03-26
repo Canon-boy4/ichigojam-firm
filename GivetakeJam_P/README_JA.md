@@ -1,5 +1,35 @@
 # GivetakeJam P
-# IchigoJam P のソースコードを変更して４K版にしたものです。よって、まずはIchigoJam Pがコンパイルできる環境を作成します。
+![Platform](https://img.shields.io/badge/platform-Raspberry%20Pi%20Pico-blue)
+![Language](https://img.shields.io/badge/language-BASIC-orange)
+![License](https://img.shields.io/badge/license-IchigoJam-green)
+![Version](https://img.shields.io/badge/version-v1.6.1-brightgreen)
+##  プログラム容量の拡張、配列変数の拡張、外部EEPROM対応の改善を行い、従来のIchigoJam P BASICの互換性を維持しながら機能強化しています。
+## 機能 / 変更点
+
+- プログラム容量を 1024 → 4096バイト に拡張
+- 内部保存本数を 100 → 25 に変更
+- 配列変数を拡張：
+  - [0] ～ [357]（#C00 に VAR2 追加）
+- FILESコマンド改善：
+  - FILES → 0～24
+  - FILES0 → 外部EEPROMがあれば 100～131
+  - FILES n → 0～n（25～99はスキップ）
+- 外部EEPROM検出を I2Cアドレス 0x50 のACKで実装
+- 24LC64 / 24LC256 / 24FC1025 に単一バイナリで対応
+- EEPROM書き込みを32バイト分割にして安全性向上
+- 配列関連の不具合修正：
+  - FOR/NEXT
+  - CLV / CLEAR
+- 間接参照 [[x]] に対応
+- メモリマップ更新：
+  - #000 CHAR
+  - #700 PCG
+  - #800 VAR
+  - #900 VRAM
+  - #C00 VAR2
+  - #E00 LIST（4096バイト）
+##
+#  IchigoJam P のソースコードを変更して４K版にしたものです。よって、まずはIchigoJam Pがコンパイルできる環境を作成します。
 
 ## 環境構築
 - "CMake"と"GCC"をインストールする  
@@ -43,16 +73,17 @@ make
 
 ## ４K版にするために GivetakeJam_P のディレクトリーにある以下のファイルを IchigoJam_P の各のディレクトリーに上書きコピーします。
     - "IchigoJam_BASIC": basic.h , ram.h
-    - "src": config.h
+    - "src": config.h , i2ceeprom.h , storage.h
     - IchigoJam P の時の様にビルドして、`IchigoJam_P.uf2`ファイルが作成できたらpicoに書き込みます。
     - IchigoJam_P.uf2: 4K版のファームウェアファイルです。
     - チェックサム
-      SHA-256: a044e888e0edd73ac1f650f108d5fdd786ef4a8424b7397830a7a624533260af
-      MD5: 8196bbe7a1f56b6a123e00c665f0e81c
-      SHA-1: 11d5b289829b82127225dc637d84c12d71d6dfef
+      SHA-256: 147a8c38c820bc1399f5d3fc848c316a912785f8a60ee5850782d401200a3496
+      MD5: 24850280e6a6ea221cf4c470f14a4cde
+      SHA-1: d206d96de20d9b40307e0606dd1c22b978ba9c06
     
     - ARRAY_VAR_TOTAL_TEST.BAS: 配列変数のテストプログラムです。このテストが ALL OK で通ることを確認しています。
-
+## Screenshot
+![screenshot](docs/IMG_2168up.jpg, IMG_2095up.jpg, IMG_2159up.jpg )
 ## ライセンス / license
     - Copyright 2014-2025 the IchigoJam authors. All rights reserved. MIT license.  https://ichigojam.net/license
 
@@ -62,7 +93,20 @@ make
 
 ## 利用規約に同意の上、ダウンロードしてください。第三者への配布にはライセンスが必要になります。詳しくはこちら。https://pcn.club/sp/ijp/
     - 利用規約（IchigoJamロイヤリティフリープログラム利用規約） https://ichigojam.net/ichigojam-license.pdf
-    
+
+## 既知の制限 / 注意事項
+
+- 16bit符号付き整数のみ（-32768～32767）
+- 浮動小数点なし
+- プログラム最大4096バイト
+- 外部EEPROM表示は100～131固定
+- 実際の使用本数はEEPROM容量依存
+- EEPROM検出はI2C 0x50で実施
+- ラベル末尾が数字だとエラーになる場合あり
+- 割り算は整数のみ
+
 
 ギブテクウインウイン
-2026/2/7 作成  
+2026/3/27 作成  
+![Release](https://img.shields.io/github/v/release/yourrepo)
+![Downloads](https://img.shields.io/github/downloads/yourrepo/total)
