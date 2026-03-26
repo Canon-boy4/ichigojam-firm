@@ -83,7 +83,9 @@ make
     
     - ARRAY_VAR_TOTAL_TEST.BAS: 配列変数のテストプログラムです。このテストが ALL OK で通ることを確認しています。
 ## Screenshot
-![screenshot](docs/IMG_2168up.jpg, IMG_2095up.jpg, IMG_2159up.jpg )
+![screenshot](docs/IMG_2168up.jpg)
+![screenshot](docs/IMG_2095up.jpg)
+![screenshot](docs/IMG_2159up.jpg)
 ## ライセンス / license
     - Copyright 2014-2025 the IchigoJam authors. All rights reserved. MIT license.  https://ichigojam.net/license
 
