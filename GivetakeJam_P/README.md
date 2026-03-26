@@ -111,6 +111,8 @@ To convert IchigoJam P into the 4K version, "overwrite the following files" in e
 * "src"
 
   * `config.h`
+  * `i2ceeprom.h`
+  * `storage.h`
 
 Build in the same way as IchigoJam P.
 When `IchigoJam_P.uf2` is created, write it to the Pico.
