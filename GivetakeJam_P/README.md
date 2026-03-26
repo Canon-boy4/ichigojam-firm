@@ -4,6 +4,47 @@ Therefore, you must first prepare a build environment where "IchigoJam P can be 
 
 ---
 
+## Features / Changes
+
+- Expanded program size from 1024 bytes to 4096 bytes per program.
+
+- Reduced internal storage slots from 100 to 25 (Flash-based).
+
+- Added extended array variable area:
+  - Original: [0] – [101]
+  - Extended: [0] – [357]
+  - New array region mapped at #C00
+
+- Improved FILES command behavior:
+  - FILES     → internal storage only (0–24)
+  - FILES0    → internal + external EEPROM (100–131 if detected)
+  - FILES n   → shows 0–n (skips unused 25–99 range)
+
+- External EEPROM support enhanced:
+  - Detection via I2C address 0x50 (ACK-based)
+  - Unified handling for 24LC64 / 24LC256 / 24FC1025
+
+- EEPROM write reliability improved:
+  - Uses safe 32-byte write chunks
+  - Prevents page boundary corruption across different devices
+
+- Fixed array-related issues:
+  - Correct handling of extended array area
+  - Fixed FOR/NEXT behavior with array variables
+  - CLV / CLEAR now properly reset extended array region
+
+- Added support for indirect array access ([[x]])
+
+- Internal memory layout updated:
+  - #000 CHAR
+  - #700 PCG
+  - #800 VAR
+  - #900 VRAM
+  - #C00 VAR2 (new)
+  - #E00 LIST (4096 bytes)
+
+---
+
 ## Build Environment
 - Install "CMake" and "GCC"
 
@@ -83,13 +124,13 @@ When `IchigoJam_P.uf2` is created, write it to the Pico.
 ### Checksums
 
 * "SHA-256"
-  `a044e888e0edd73ac1f650f108d5fdd786ef4a8424b7397830a7a624533260af`
+  `147a8c38c820bc1399f5d3fc848c316a912785f8a60ee5850782d401200a3496`
 
 * "MD5"
-  `8196bbe7a1f56b6a123e00c665f0e81c`
+  `24850280e6a6ea221cf4c470f14a4cde`
 
 * "SHA-1"
-  `11d5b289829b82127225dc637d84c12d71d6dfef`
+  `d206d96de20d9b40307e0606dd1c22b978ba9c06`
 
 ---
 
@@ -134,5 +175,47 @@ For details, see:
 
 ---
 
+## Known limitations / Notes
+
+- This firmware uses 16-bit signed integers only (-32768 to 32767).
+  Floating point numbers and unsigned 16-bit values are not supported.
+
+- Program size is limited to 4096 bytes per slot.
+
+- Internal storage provides 25 program slots (0–24).
+
+- External EEPROM file numbers are fixed to 100–131 for display (FILES0).
+  The actual number of usable slots depends on the EEPROM capacity:
+  - 24LC64   → approx. 2 slots
+  - 24LC256  → approx. 8 slots
+  - 24FC1025 → up to 32 slots
+
+- External EEPROM detection is performed by checking I2C address 0x50.
+  If the device responds (ACK), FILES0 will include the external range.
+
+- EEPROM write operations use safe 32-byte chunks to support multiple devices
+  (24LC64 / 24LC256 / 24FC1025) with a single firmware build.
+
+- Array variables are extended:
+  - Original: [0] – [101]
+  - Extended: [0] – [357]
+  - Additional array area starts at address #C00
+
+- Indirect addressing (e.g. [[x]]) is supported, but invalid indices
+  may cause "Index out of range" errors.
+
+- Labels should use alphabetic characters.
+  Labels ending with digits may cause syntax errors in some cases.
+
+- Division results are integer-only.
+  For power-of-two division, bit shift operations (e.g. >>1, >>2) are recommended.
+
+- FILES command behavior:
+  - FILES     → shows internal storage only (0–24)
+  - FILES0    → shows internal + external (100–131 if EEPROM exists)
+  - FILES n   → shows 0–n (skips unused 25–99 range)
+
+---
+
 Givetakewinwin
-Created on February 7, 2026
+Created on March 27, 2026
