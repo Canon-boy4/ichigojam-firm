@@ -1,4 +1,9 @@
 # GivetakeJam P
+![Platform](https://img.shields.io/badge/platform-Raspberry%20Pi%20Pico-blue)
+![Language](https://img.shields.io/badge/language-BASIC-orange)
+![License](https://img.shields.io/badge/license-IchigoJam-green)
+![Version](https://img.shields.io/badge/version-v1.0-brightgreen)
+
 GivetakeJam P is a "4K version of IchigoJam P", created by modifying the original IchigoJam P source code.  
 Therefore, you must first prepare a build environment where "IchigoJam P can be compiled correctly".
 
@@ -145,7 +150,11 @@ When `IchigoJam_P.uf2` is created, write it to the Pico.
 ```
 ALL OK
 ```
+## Screenshot
 
+![screenshot](docs/IMG_2095up.jpg)
+![screenshot](docs/IMG_2159up.jpg)
+![screenshot](docs/IMG_2168up.jpg)
 ---
 
 ## License
@@ -218,6 +227,8 @@ For details, see:
   - FILES n   → shows 0–n (skips unused 25–99 range)
 
 ---
+![Release](https://img.shields.io/github/v/release/yourrepo)
+![Downloads](https://img.shields.io/github/downloads/yourrepo/total)
 
 Givetakewinwin
 Created on March 27, 2026
