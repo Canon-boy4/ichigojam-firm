@@ -373,6 +373,7 @@ S_INLINE void command_end();
 static void command_load(int mode);
 S_INLINE void command_save();
 S_INLINE void command_files();
+S_INLINE int i2c_eeprom_exists(); // 外部EEPROM(あり:1, なし:1)
 S_INLINE void command_led();
 S_INLINE void command_out();
 S_INLINE void command_pwm();
@@ -2731,50 +2732,87 @@ S_INLINE void command_files() {
 	continue_files = 0;
 	#endif
 
-	int16 endn = N_FLASH_STORAGE - 1; // default Flash only
+	/*
+	 * ===== MODIFIED =====
+	 * Default behavior:
+	 *   FILES      -> show internal Flash only (0 .. N_FLASH_STORAGE-1)
+	 *   FILES0     -> show internal + external EEPROM (100 .. 131) if EEPROM exists
+	 *   FILES30    -> show up to 30
+	 *
+	 * In this 4KB version:
+	 *   internal storage = 0 .. 24
+	 *   external display = 100 .. 131
+	 *
+	 * External EEPROM existence is checked by I2C address 0x50 ACK,
+	 * not by i2c0_init() return value.
+	 */
+
+	int16 endn = N_FLASH_STORAGE - 1; // default: internal Flash only
 	int16 startn = 0;
+
 	if (token_getChar()) {
 		endn = token_expression();
 		IJB_ERR_CHK();
+
 		Token t; Token_get(t);
 		if (t.code != TOKEN_COMMA) {
 			token_back();
+
+			/*
+			 * ===== MODIFIED =====
+			 * Special case: FILES0
+			 *
+			 * If an external EEPROM responds at I2C address 0x50,
+			 * show external file numbers 100 .. 131.
+			 * Otherwise, keep internal-only display.
+			 */
 			if (endn == 0) { // ver 1.2.4
-				endn = 100 + 128 - 1;
+				if (i2c_eeprom_exists()) {
+					endn = 100 + 32 - 1; // fixed external display range: 100..131
+				} else {
+					endn = N_FLASH_STORAGE - 1; // internal only
+				}
 			}
 		} else {
+			/*
+			 * FILES m,n
+			 */
 			startn = endn;
 			endn = token_expression();
 			IJB_ERR_CHK();
 		}
 	}
+
 	token_end();
 	IJB_ERR_CHK();
 
-//	int max = endn;
-	if (endn >= 100) {
-		if (!i2c0_init()) { // ?いる?
-//			max += 128;
-//			max += endn - 100;
-		}
-	}
-
 	int cnt = 0;
-//	int wcnt = 0;
 	int16 buf[16];
+
 	for (int i = startn; i <= endn; i++) {
+		/*
+		 * ===== MODIFIED =====
+		 * Skip unused gap between internal and external numbering.
+		 *
+		 * Internal: 0 .. 24
+		 * Gap     : 25 .. 99
+		 * External: 100 ..
+		 */
 		if (i >= N_FLASH_STORAGE && i < 100)
 			continue;
-		
-		int res = IJB_load(i, (uint8*)buf, SCREEN_W/*32*/, 0);
+
 		/*
-		if (res < 0) { // 1.4.2b19
-			break;
-		}
-		*/
+		 * ===== MODIFIED =====
+		 * External display range is fixed to 100 .. 131.
+		 * Do not display numbers 132 or higher.
+		 */
+		if (i >= 132)
+			continue;
+
+		int res = IJB_load(i, (uint8*)buf, SCREEN_W/*32*/, 0);
+
 		int b = put_num(i);
-		if (res == SCREEN_W/*32*/) { // && line > 0) {
-//		if (res > 5) { // ver 1.2 beta 35
+		if (res == SCREEN_W/*32*/) { // && line > 0)
 			int16 line = *buf;
 			if (line > 0) {
 				put_chr(' ');
@@ -2787,57 +2825,67 @@ S_INLINE void command_files() {
 			}
 		}
 		put_chr('\n');
+
 		cnt++;
-//			wcnt = 0;
 		if (cnt >= SCREEN_H - 2) {
 			IJB_wait(60, 1);
-			if (stopExecute()) { // なぜかUARTからのESCでフリーズ
-//				IJB_wait(60); // why??
+			if (stopExecute()) { // ESC etc.
 				break;
 			}
+
 			#ifdef IJB_DONT_LOOP
 			continue_files = 1;
 			bk_startn_files = i;
 			bk_endn_files = endn;
 			return;
 			#endif
+
 			cnt = 0;
 		}
-
-		/* else {
-			wcnt++;
-			if (wcnt == 999) { // いくつなら乱れないか？
-				if (IJB_wait(1)) { // waitしないと表示が乱れる
-					return;
-				}
-				wcnt = 0;
-			}
-		}*/
 	}
 }
+
 #ifdef IJB_DONT_LOOP
 int command_files_next() {
 	if (!continue_files) {
 		return 0;
 	}
+
 	if (stopExecute()) {
 		continue_files = 0;
 		return 0;
 	}
+
 	int16 startn = bk_startn_files + 1;
 	int16 endn = bk_endn_files;
 
 	int cnt = 0;
-//	int wcnt = 0;
 	int16 buf[16];
+
 	for (int i = startn; i <= endn; i++) {
+		/*
+		 * ===== MODIFIED =====
+		 * Skip unused gap between internal and external numbering.
+		 *
+		 * Internal: 0 .. 24
+		 * Gap     : 25 .. 99
+		 * External: 100 ..
+		 */
 		if (i >= N_FLASH_STORAGE && i < 100)
 			continue;
+
+		/*
+		 * ===== MODIFIED =====
+		 * External display range is fixed to 100 .. 131.
+		 * Do not display numbers 132 or higher.
+		 */
+		if (i >= 132)
+			continue;
+
 		int b = put_num(i);
 
 		int res = IJB_load(i, (uint8*)buf, SCREEN_W/*32*/, 0);
-		if (res == SCREEN_W/*32*/) { // && line > 0) {
-//		if (res > 5) { // ver 1.2 beta 35
+		if (res == SCREEN_W/*32*/) { // && line > 0)
 			int16 line = *buf;
 			if (line > 0) {
 				put_chr(' ');
@@ -2850,24 +2898,29 @@ int command_files_next() {
 			}
 		}
 		put_chr('\n');
+
 		cnt++;
-//			wcnt = 0;
 		if (cnt >= SCREEN_H - 2) {
 			IJB_wait(60, 1);
-			if (stopExecute()) { // なぜかUARTからのESCでフリーズ
-//				IJB_wait(60); // why??
+			if (stopExecute()) {
 				continue_files = 0;
 				return 0;
 			}
-			continue_files = 1;
+
+			/*
+			 * ===== MODIFIED =====
+			 * Save current position so next call resumes correctly.
+			 */
 			bk_startn_files = i;
 			return 1;
 		}
 	}
+
 	continue_files = 0;
 	return 0;
 }
 #endif
+
 
 //
 S_INLINE void command_led() {

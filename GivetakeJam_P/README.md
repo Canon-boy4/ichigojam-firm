@@ -1,12 +1,10 @@
-# GivetakeJam P
+# GivetakeJam BASIC
 ![Platform](https://img.shields.io/badge/platform-Raspberry%20Pi%20Pico-blue)
 ![Language](https://img.shields.io/badge/language-BASIC-orange)
 ![License](https://img.shields.io/badge/license-IchigoJam-green)
 ![Version](https://img.shields.io/badge/version-v1.0-brightgreen)
 
-GivetakeJam P is a "4K version of IchigoJam P", created by modifying the original IchigoJam P source code.  
-Therefore, you must first prepare a build environment where "IchigoJam P can be compiled correctly".
-
+An extended version of IchigoJam BASIC for Raspberry Pi Pico with 4KB program size, expanded array variables, and improved external EEPROM support.
 ---
 
 ## Features / Changes
@@ -49,6 +47,9 @@ Therefore, you must first prepare a build environment where "IchigoJam P can be 
   - #E00 LIST (4096 bytes)
 
 ---
+
+#GivetakeJam P is a "4K version of IchigoJam P", created by modifying the original IchigoJam P source code.  
+ Therefore, you must first prepare a build environment where "IchigoJam P can be compiled correctly".
 
 ## Build Environment
 - Install "CMake" and "GCC"
@@ -152,9 +153,15 @@ ALL OK
 ```
 ## Screenshot
 
+### Overall system configuration
 ![screenshot](docs/IMG_2095up.jpg)
+
+### - Display details ( name, HELP command：Memory map, FILES command )
 ![screenshot](docs/IMG_2159up.jpg)
+
+### IchigoJam_P compatible board (MECHTARIAT PJ convex)
 ![screenshot](docs/IMG_2168up.jpg)
+
 ---
 
 ## License
@@ -188,9 +195,6 @@ For details, see:
 
 ## Known limitations / Notes
 
-- This firmware uses 16-bit signed integers only (-32768 to 32767).
-  Floating point numbers and unsigned 16-bit values are not supported.
-
 - Program size is limited to 4096 bytes per slot.
 
 - Internal storage provides 25 program slots (0–24).
@@ -214,12 +218,6 @@ For details, see:
 
 - Indirect addressing (e.g. [[x]]) is supported, but invalid indices
   may cause "Index out of range" errors.
-
-- Labels should use alphabetic characters.
-  Labels ending with digits may cause syntax errors in some cases.
-
-- Division results are integer-only.
-  For power-of-two division, bit shift operations (e.g. >>1, >>2) are recommended.
 
 - FILES command behavior:
   - FILES     → shows internal storage only (0–24)
