@@ -154,13 +154,13 @@ ALL OK
 ## Screenshot
 
 ### Overall system configuration
-![screenshot](./docs/IMG_2095up.jpg)
+![screenshot](./docs/IMG_2095up.png)
 
 ### - Display details ( name, HELP command：Memory map, FILES command )
-![screenshot](./docs/IMG_2159up.jpg)
+![screenshot](./docs/IMG_2159up.png)
 
 ### IchigoJam_P compatible board (MECHTARIAT PJ convex)
-![screenshot](./docs/IMG_2168up.jpg)
+![screenshot](./docs/IMG_2168up.png)
 
 ---
 
