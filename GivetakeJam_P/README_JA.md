@@ -87,13 +87,13 @@ make
 ## Screenshot
 
 ### 動作環境
-![screenshot](docs/IMG_2095up.jpg)
+![screenshot](/GivetakeJam_P/docs/IMG_2095up.jpg)
 
 ### 表示画面 ( 名称, HELP表示：メモリマップ, FILES表示 )
-![screenshot](docs/IMG_2159up.jpg)
+![screenshot](/GivetakeJam_P/docs/IMG_2159up.jpg)
 
 ### IchigoJam_P 互換基板 ( MECHTARIAT PJ 凸 )
-![screenshot](docs/IMG_2168up.jpg)
+![screenshot](/GivetakeJam_P/docs/IMG_2168up.jpg)
 
 ## ライセンス / license
     - Copyright 2014-2025 the IchigoJam authors. All rights reserved. MIT license.  https://ichigojam.net/license
