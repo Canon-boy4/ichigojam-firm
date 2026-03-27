@@ -154,13 +154,13 @@ ALL OK
 ## Screenshot
 
 ### Overall system configuration
-![screenshot](/GivetakeJam_P/docs/IMG_2095up.jpg)
+![screenshot](./docs/IMG_2095up.jpg)
 
 ### - Display details ( name, HELP command：Memory map, FILES command )
-![screenshot](/GivetakeJam_P/docs/IMG_2159up.jpg)
+![screenshot](./docs/IMG_2159up.jpg)
 
 ### IchigoJam_P compatible board (MECHTARIAT PJ convex)
-![screenshot](/GivetakeJam_P/docs/IMG_2168up.jpg)
+![screenshot](./docs/IMG_2168up.jpg)
 
 ---
 
