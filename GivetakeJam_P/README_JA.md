@@ -114,5 +114,5 @@ make
 
 ギブテクウインウイン
 2026/3/27 作成  
-![Release](https://img.shields.io/github/v/release/yourrepo)
-![Downloads](https://img.shields.io/github/downloads/yourrepo/total)
+![Release](https://img.shields.io/github/v/release/IchigoJam/ichigojam-firm)
+![Downloads](https://img.shields.io/github/downloads/IchigoJam/ichigojam-firm/total)

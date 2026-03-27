@@ -225,8 +225,8 @@ For details, see:
   - FILES n   → shows 0–n (skips unused 25–99 range)
 
 ---
-![Release](https://img.shields.io/github/v/release/yourrepo)
-![Downloads](https://img.shields.io/github/downloads/yourrepo/total)
+![Release](https://img.shields.io/github/v/release/IchigoJam/ichigojam-firm)
+![Downloads](https://img.shields.io/github/downloads/IchigoJam/ichigojam-firm/total)
 
 Givetakewinwin
 Created on March 27, 2026
