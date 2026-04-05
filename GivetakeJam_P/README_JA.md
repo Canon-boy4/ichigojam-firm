@@ -3,25 +3,37 @@
 ![Language](https://img.shields.io/badge/language-BASIC-orange)
 ![License](https://img.shields.io/badge/license-IchigoJam-green)
 ![Version](https://img.shields.io/badge/version-v1.6.1-brightgreen)
+![Status](https://img.shields.io/badge/status-stable-success)
 
-##  プログラム容量の拡張、配列変数の拡張、外部EEPROM対応の改善を行い、従来のIchigoJam P BASICの互換性を維持しながら機能強化しています。
+##  プログラム容量の拡張、配列変数の拡張、外部EEPROM対応の改善、NEC方式の赤外線受信コマンドの追加を行い、従来のIchigoJam P BASICの互換性を維持しながら機能強化しています。
 
 ## 機能 / 変更点
 - プログラム容量を 1024 → 4096バイト に拡張
+
 - 内部保存プログラム本数を 100 → 25 に変更
+
 - 配列変数を拡張：
-  - [0] ～ [357]（#C00 に VAR2 追加）
+  - オリジナル：[0] ～ [101]
+  - 追加した変数：[102] ～ [357]
+    - #C00 に VAR2 追加
+
+- 配列関連の不具合修正：
+  - FOR/NEXT 動作を修正
+  - CLV / CLEAR で拡張配列領域も初期化されるよう修正
+  - 間接参照 [[x]] に対応
+
 - FILESコマンド改善：
   - FILES → 0～24
   - FILES0 → 外部EEPROMがあれば 100～131
   - FILES n → 0～n（25～99はスキップ）
-- 外部EEPROM検出を I2Cアドレス 0x50 のACKで実装
-- 24LC64 / 24LC256 / 24FC1025 に単一バイナリで対応
-- EEPROM書き込みを32バイト分割にして安全性向上
-- 配列関連の不具合修正：
-  - FOR/NEXT
-  - CLV / CLEAR
-- 間接参照 [[x]] に対応
+
+- 外部EEPROM 対応の改善
+  - 外部EEPROM検出を I2Cアドレス 0x50 のACKで実装
+  - 24LC64 / 24LC256 / 24FC1025 に単一バイナリで対応
+  - EEPROM書き込みを32バイト分割にして安全性向上
+
+- LIST エリアを #E00 に移動
+
 - メモリマップ更新：
   - #000 CHAR
   - #700 PCG
@@ -29,7 +41,40 @@
   - #900 VRAM
   - #C00 VAR2
   - #E00 LIST（4096バイト）
-##
+
+- HX1838系赤外線リモコン受信モジュール向け NEC方式赤外線受信コマンド IR.IN を追加
+  - 書式
+    ```sh
+      IR.IN port,[n]
+  - 説明
+    - 指定した入力ポートから NEC形式の赤外線信号を受信し、デコード結果を [n] から始まる配列変数に格納します。
+  - 結果の格納先
+    - [n+0] = 生データ 1 バイト目
+    - [n+1] = 生データ 2 バイト目
+    - [n+2] = 生データ 3 バイト目
+    - [n+3] = 生データ 4 バイト目
+    - [n+4] = repeat フラグ
+    - [n+5] = エラー コード
+    - [n+6] = モード
+      - 0 = NEC 標準
+      - 1 = NEC 拡張
+  - 使用例 プログラム IR_IN_TEST.BAS
+  - 使用例 表示結果 807F01FE
+  - 注意
+    - HX1838の出力は待機時 HIGH を前提としています
+    - 38kHz搬送波は受光モジュール側で復調済みです
+    - 安定動作のため、エラー除外と repeat除外を推奨します
+    - リーダーコード検出後の NECデコード区間では、安定化のため表示処理と割り込みの影響を抑えています
+
+- 拡張版識別のため VER() を 16110 に変更
+  - 使用例 BASIC
+    ```sh 
+     ? VER()
+     16110
+    ```
+
+---
+
 #  IchigoJam P BASICのソースコードを変更して４K版にしたものです。よって、まずはIchigoJam P BASICがコンパイルできる環境を作成します。
 
 ## 環境構築
@@ -73,14 +118,14 @@ make
 
 
 ## ４K版にするために GivetakeJam_P のディレクトリーにある以下のファイルを IchigoJam_P の各のディレクトリーに上書きコピーします。
-    - "IchigoJam_BASIC": basic.h , ram.h
-    - "src": config.h , i2ceeprom.h , storage.h
+    - "IchigoJam_BASIC": basic.h , ram.h , tokens_v1.5.h
+    - "src": config.h , i2ceeprom.h , storage.h , io.h
     - IchigoJam P の時の様にビルドして、`IchigoJam_P.uf2`ファイルが作成できたらpicoに書き込みます。
     - IchigoJam_P.uf2: 4K版のファームウェアファイルです。
     - チェックサム
-      SHA-256: 147a8c38c820bc1399f5d3fc848c316a912785f8a60ee5850782d401200a3496
-      MD5: 24850280e6a6ea221cf4c470f14a4cde
-      SHA-1: d206d96de20d9b40307e0606dd1c22b978ba9c06
+      SHA-256: acda7aaff53c36c3e38e938e963c0ca5b4d9f83274c81280892e9f44b1d3cce4
+      MD5: ffbf860f5a775dc7a4ff89680fbc472f
+      SHA-1: 11e6f17eb6d829a595753a7fc565935d4653f374
     
     - ARRAY_VAR_TOTAL_TEST.BAS: 配列変数のテストプログラムです。このテストが ALL OK で通ることを確認しています。
 
@@ -106,13 +151,17 @@ make
     - 利用規約（IchigoJamロイヤリティフリープログラム利用規約） https://ichigojam.net/ichigojam-license.pdf
 
 ## 既知の制限 / 注意事項
-- プログラム最大4096バイト
-- 外部EEPROM表示は100～131固定
+- プログラム最大 4096 バイト
+- 内部保存プログラム本数は 25本
+- 外部EEPROM表示は 100～131固定
+  - 24LC64 追加本数 2本
+  - 24LC256 追加本数 8本
+  - 24FC1025 追加本数 32本 
 - 実際の使用可能プログラム本数はEEPROM容量依存
-- EEPROM検出はI2C 0x50で実施
-
+- EEPROM検出はI2C アドレス 0x50 の応答で判定
+- IR受信を安定させるため、BASIC側で repeat 除外を推奨します
 
 ギブテクウインウイン
-2026/3/27 作成  
+2026/4/5 作成  
 ![Release](https://img.shields.io/github/v/release/IchigoJam/ichigojam-firm)
 ![Downloads](https://img.shields.io/github/downloads/IchigoJam/ichigojam-firm/total)

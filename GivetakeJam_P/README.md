@@ -2,9 +2,11 @@
 ![Platform](https://img.shields.io/badge/platform-Raspberry%20Pi%20Pico-blue)
 ![Language](https://img.shields.io/badge/language-BASIC-orange)
 ![License](https://img.shields.io/badge/license-IchigoJam-green)
-![Version](https://img.shields.io/badge/version-v1.0-brightgreen)
+![Version](https://img.shields.io/badge/version-v1.6.1-brightgreen)
+![Status](https://img.shields.io/badge/status-stable-success)
 
-An extended version of IchigoJam BASIC for Raspberry Pi Pico with 4KB program size, expanded array variables, and improved external EEPROM support.
+An extended version of IchigoJam BASIC for Raspberry Pi Pico with 4KB program size, expanded array variables, improved external EEPROM support, and adds a NEC infrared receiver command.
+
 ---
 
 ## Features / Changes
@@ -17,6 +19,12 @@ An extended version of IchigoJam BASIC for Raspberry Pi Pico with 4KB program si
   - Original: [0] – [101]
   - Extended: [0] – [357]
   - New array region mapped at #C00
+
+- Fixed array-related issues:
+  - Correct handling of extended array area
+  - Fixed FOR/NEXT behavior with array variables
+  - CLV / CLEAR now properly reset extended array region
+  - Added support for indirect array access ([[x]])
 
 - Improved FILES command behavior:
   - FILES     → internal storage only (0–24)
@@ -31,12 +39,7 @@ An extended version of IchigoJam BASIC for Raspberry Pi Pico with 4KB program si
   - Uses safe 32-byte write chunks
   - Prevents page boundary corruption across different devices
 
-- Fixed array-related issues:
-  - Correct handling of extended array area
-  - Fixed FOR/NEXT behavior with array variables
-  - CLV / CLEAR now properly reset extended array region
-
-- Added support for indirect array access ([[x]])
+- Moved LIST area to #E00
 
 - Internal memory layout updated:
   - #000 CHAR
@@ -46,7 +49,37 @@ An extended version of IchigoJam BASIC for Raspberry Pi Pico with 4KB program si
   - #C00 VAR2 (new)
   - #E00 LIST (4096 bytes)
 
----
+- Added IR.IN command for NEC infrared reception with HX1838-compatible modules
+  - Syntax
+    ```sh
+      IR.IN port,[n]
+  - Description
+   This command waits for a NEC-format infrared signal from the specified input port, decodes it, and stores the result into array variables starting at [n].
+  - Result Array Layout
+    - [n+0] = raw byte 1
+    - [n+1] = raw byte 2
+    - [n+2] = raw byte 3
+    - [n+3] = raw byte 4
+    - [n+4] = repeat flag
+    - [n+5] = error code
+    - [n+6] = mode
+      - 0 = standard NEC
+      - 1 = NEC extended
+  - Example IR_IN_TEST.BAS
+  - Example Output 807F01FE
+  - Notes
+    - HX1838 output is assumed to be idle HIGH
+    - The 38kHz carrier is already demodulated by the receiver module
+    - For stable operation, error filtering and repeat filtering are recommended
+    - The NEC decode section is protected after leader detection for timing stability
+
+- Updated VER() to 16110 for build identification
+  - Example BASIC
+    ```sh 
+     ? VER()
+     16110
+    ```
+ ---
 
 #GivetakeJam P is a "4K version of IchigoJam P", created by modifying the original IchigoJam P source code.  
  Therefore, you must first prepare a build environment where "IchigoJam P can be compiled correctly".
@@ -57,7 +90,7 @@ An extended version of IchigoJam BASIC for Raspberry Pi Pico with 4KB program si
 ---
 
 ## IchigoJam_P Build Environment
-    - Create the build environment inside the "IchigoJam_P" directory.
+- Create the build environment inside the "IchigoJam_P" directory.
 
 - Place the following libraries "directly under the `IchigoJam_P` directory":
     - "IchigoJam_BASIC"  
@@ -113,6 +146,7 @@ To convert IchigoJam P into the 4K version, "overwrite the following files" in e
 * "IchigoJam_BASIC"
   * `basic.h`
   * `ram.h`
+  * `tokens_v1.5.h`
 
 * "src"
 
@@ -132,13 +166,13 @@ When `IchigoJam_P.uf2` is created, write it to the Pico.
 ### Checksums
 
 * "SHA-256"
-  `147a8c38c820bc1399f5d3fc848c316a912785f8a60ee5850782d401200a3496`
+  `acda7aaff53c36c3e38e938e963c0ca5b4d9f83274c81280892e9f44b1d3cce4`
 
 * "MD5"
-  `24850280e6a6ea221cf4c470f14a4cde`
+  `ffbf860f5a775dc7a4ff89680fbc472f`
 
 * "SHA-1"
-  `d206d96de20d9b40307e0606dd1c22b978ba9c06`
+  `11e6f17eb6d829a595753a7fc565935d4653f374`
 
 ---
 
@@ -211,22 +245,10 @@ For details, see:
 - EEPROM write operations use safe 32-byte chunks to support multiple devices
   (24LC64 / 24LC256 / 24FC1025) with a single firmware build.
 
-- Array variables are extended:
-  - Original: [0] – [101]
-  - Extended: [0] – [357]
-  - Additional array area starts at address #C00
-
-- Indirect addressing (e.g. [[x]]) is supported, but invalid indices
-  may cause "Index out of range" errors.
-
-- FILES command behavior:
-  - FILES     → shows internal storage only (0–24)
-  - FILES0    → shows internal + external (100–131 if EEPROM exists)
-  - FILES n   → shows 0–n (skips unused 25–99 range)
-
+- For stable IR reception, repeat filtering is recommended in BASIC
 ---
 ![Release](https://img.shields.io/github/v/release/IchigoJam/ichigojam-firm)
 ![Downloads](https://img.shields.io/github/downloads/IchigoJam/ichigojam-firm/total)
 
 Givetakewinwin
-Created on March 27, 2026
+Created on April 5, 2026

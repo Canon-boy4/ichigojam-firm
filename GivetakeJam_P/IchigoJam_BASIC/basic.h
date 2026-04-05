@@ -124,6 +124,11 @@ static void iot_out2(int ad, int len, int flash);
 
 S_INLINE void ws_out(int port, int nled, int reapeat);
 
+
+// ===== MODIFIED (Givetake BASIC) =====
+//S_INLINE void ir_in(int port);
+static int ir_port_to_gpio(int port);
+
 // util -----------------------------------------------------
 
 //#define clearMemory(p, len) memset(p, 0, len)
@@ -419,6 +424,8 @@ S_INLINE void command_iot_out();
 #endif
 S_INLINE void command_ws_out(int port);
 
+// ===== MODIFIED (Givetake BASIC) =====
+S_INLINE void command_ir_in();
 
 // token -----------------------------------------------------------------
 
@@ -625,6 +632,7 @@ int basic_execute(char* commandline) {
 #endif
 			//case TOKEN_WS_OUT:	command_ws_out(1);							break;
 			case TOKEN_WS_LED:	command_ws_out(1);							break; // 7 == LED
+			case TOKEN_IR_IN:	command_ir_in();			 break;
 			default:
 				#ifdef USE_EXTENSION
 				if (extension_command(token.code)) {
@@ -1335,7 +1343,7 @@ static int16 token_expression5() {
 		case TOKEN_VER: {
 			int n = token_opt1();
 			if (n == 0)
-				return IJB_VER * 100 + IJB_BUILD;
+				return IJB_VER * 100 + IJB_BUILD + 10;
 			if (n == 3)
 				return LANG;
 			if (n == 4)
@@ -3563,6 +3571,303 @@ S_INLINE void command_ws_out(int port) {
 	int n = token_expression();
 	int m = token_option1(1);
 	ws_out(port, n, m);
+}
+
+// ===== MODIFIED (Givetake BASIC) =====
+// NEC / NEC-extended infrared decoder for HX1838 etc.
+//
+// BASIC usage:
+//   IR.IN port,[n]
+//
+// Result:
+//   [n+0] = raw byte 0
+//   [n+1] = raw byte 1
+//   [n+2] = raw byte 2
+//   [n+3] = raw byte 3
+//   [n+4] = repeat flag
+//   [n+5] = error code
+//   [n+6] = mode
+//            0 = standard NEC
+//            1 = NEC extended
+//
+// Example:
+//   If the received code is 807F01FE,
+//   BASIC can print it as:
+//     ? HEX$([0],2);HEX$([1],2);HEX$([2],2);HEX$([3],2)
+//
+// Notes:
+// - HX1838 output is assumed idle HIGH.
+// - The 38kHz carrier is already demodulated by HX1838.
+// - We only measure pulse widths.
+// - Repeat frame preserves previous bytes.
+// - To improve stability, video output + interrupts are disabled
+//   only AFTER leader-low detection.
+
+static int ir_wait_level_timeout(int gpio, int level, uint32_t timeout_us) {
+    uint32_t st = time_us_32();
+    while (gpio_get(gpio) != level) {
+        if ((uint32_t)(time_us_32() - st) > timeout_us) {
+            return -1;
+        }
+    }
+    return 0;
+}
+
+static int ir_measure_pulse_us(int gpio, int level, uint32_t timeout_us) {
+    if (ir_wait_level_timeout(gpio, level, timeout_us) < 0) {
+        return -1;
+    }
+
+    uint32_t st = time_us_32();
+    while (gpio_get(gpio) == level) {
+        if ((uint32_t)(time_us_32() - st) > timeout_us) {
+            return -1;
+        }
+    }
+
+    return (int)(time_us_32() - st);
+}
+
+// ===== MODIFIED (Givetake BASIC) =====
+// Decode NEC / NEC-extended frame AFTER leader-low has already been detected.
+//
+// Preconditions:
+// - The first 9ms LOW leader pulse has already been detected.
+// - This function starts from the leader-high period.
+// - Caller may already have disabled video/interrupts.
+//
+// Return bytes:
+//   b0,b1,b2,b3 = frame bytes in display order
+//   rpt         = repeat flag
+//   mode        = 0 standard NEC / 1 NEC extended
+//
+// Error codes:
+//   0 = success
+//   3 = leader-high mismatch
+//   4 = bit-low mismatch
+//   5 = bit-high timeout/mismatch
+//   6 = command inverse check error
+static int ir_decode_nec_after_leader_low(int gpio, uint8_t* b0, uint8_t* b1, uint8_t* b2, uint8_t* b3, uint8_t* rpt, uint8_t* mode) {
+    int t_low, t_high;
+    uint32_t data = 0;
+
+    *rpt = 0;
+    *mode = 0;
+
+    // ------------------------------------------------------------
+    // We arrive here AFTER leader LOW (~9ms) has been detected.
+    // Now read leader HIGH:
+    //   normal frame -> about 4.5ms
+    //   repeat frame -> about 2.25ms
+    // ------------------------------------------------------------
+    t_high = ir_measure_pulse_us(gpio, 1, 7000);
+
+    // NEC repeat frame
+    if (t_high > 1800 && t_high < 3000) {
+        *rpt = 1;
+        return 0;
+    }
+
+    if (t_high < 3500 || t_high > 5500) {
+        return 3;
+    }
+
+    // ------------------------------------------------------------
+    // Receive 32 bits, LSB first
+    //
+    // Each bit:
+    //   LOW  ~560us
+    //   HIGH ~560us  -> 0
+    //   HIGH ~1690us -> 1
+    // ------------------------------------------------------------
+    for (int i = 0; i < 32; i++) {
+        // low part
+        t_low = ir_measure_pulse_us(gpio, 0, 2000);
+        if (t_low < 250 || t_low > 1000) {
+            return 4;
+        }
+
+        // high part
+        t_high = ir_measure_pulse_us(gpio, 1, 3000);
+        if (t_high < 200) {
+            return 5;
+        }
+
+        if (t_high > 1100) {
+            data |= (1u << i);
+        }
+    }
+
+    {
+        uint8_t rx0 =  data        & 0xff;   // first byte received
+        uint8_t rx1 = (data >> 8)  & 0xff;   // second byte
+        uint8_t rx2 = (data >> 16) & 0xff;   // third byte
+        uint8_t rx3 = (data >> 24) & 0xff;   // fourth byte
+
+        // --------------------------------------------------------
+        // Common NEC rule:
+        //   command byte and its inverse must match
+        // --------------------------------------------------------
+        if ((uint8_t)(rx2 ^ rx3) != 0xff) {
+            return 6;
+        }
+
+        // --------------------------------------------------------
+        // Standard NEC:
+        //   rx0 = addr
+        //   rx1 = ~addr
+        //   rx2 = cmd
+        //   rx3 = ~cmd
+        //
+        // NEC extended:
+        //   rx0 = addr low
+        //   rx1 = addr high
+        //   rx2 = cmd
+        //   rx3 = ~cmd
+        //
+        // We return display-order bytes.
+        //
+        // For NEC-extended, swap the first two bytes so codes like
+        //   807F01FE
+        // are shown in natural human-readable order.
+        // --------------------------------------------------------
+        if ((uint8_t)(rx0 ^ rx1) == 0xff) {
+            // standard NEC
+            *b0 = rx0;
+            *b1 = rx1;
+            *b2 = rx2;
+            *b3 = rx3;
+            *mode = 0;
+        } else {
+            // NEC extended
+            *b0 = rx1;   // high byte first
+            *b1 = rx0;   // low byte second
+            *b2 = rx2;
+            *b3 = rx3;
+            *mode = 1;
+        }
+    }
+
+    return 0;
+}
+
+// ===== MODIFIED (Givetake BASIC) =====
+// Wait for NEC leader-low (~9ms) WITHOUT disabling video/interrupts.
+// Only after leader-low is detected, disable video + interrupts
+// and decode the rest of the frame.
+//
+// Result array:
+//   [base+0] = raw byte 0
+//   [base+1] = raw byte 1
+//   [base+2] = raw byte 2
+//   [base+3] = raw byte 3
+//   [base+4] = repeat flag
+//   [base+5] = error code
+//   [base+6] = mode
+//
+// Error codes:
+//   0 = success
+//   1 = invalid port
+//   2 = leader-low timeout / mismatch
+//   3 = leader-high mismatch
+//   4 = bit-low mismatch
+//   5 = bit-high mismatch
+//   6 = command inverse check error
+S_INLINE void command_ir_in() {
+    int port = token_expression();
+    IJB_ERR_CHK();
+
+    Token t; Token_get(t);
+    if (t.code != TOKEN_COMMA) {
+        command_error(ERR_SYNTAX_ERROR);
+        return;
+    }
+
+    // second argument must be [n]
+    Token_get(t);
+    if (t.code != TOKEN_ARRAY) {
+        command_error(ERR_SYNTAX_ERROR);
+        return;
+    }
+
+    int base = token_getArrayIndex();
+    IJB_ERR_CHK();
+
+    token_end();
+    IJB_ERR_CHK();
+
+    // We use [base] .. [base+6]
+    if (base < 0 || base + 6 >= IJB_SIZEOF_ARRAY_MAX) {
+        command_error(ERR_INDEX_OUT_OF_RANGE);
+        return;
+    }
+
+    int gpio = ir_port_to_gpio(port);
+    if (gpio < 0) {
+        *basic_getArrayPtr(base + 0) = 0;
+        *basic_getArrayPtr(base + 1) = 0;
+        *basic_getArrayPtr(base + 2) = 0;
+        *basic_getArrayPtr(base + 3) = 0;
+        *basic_getArrayPtr(base + 4) = 0;
+        *basic_getArrayPtr(base + 5) = 1; // invalid port
+        *basic_getArrayPtr(base + 6) = 0;
+        return;
+    }
+
+    gpio_init(gpio);
+    gpio_set_dir(gpio, GPIO_IN);
+    gpio_pull_up(gpio);   // HX1838 output is usually idle HIGH
+
+    // ------------------------------------------------------------
+    // Preserve previous bytes so repeat frame can keep them.
+    // This way, when repeat is received, the last decoded code
+    // remains available in [base+0] .. [base+3].
+    // ------------------------------------------------------------
+    uint8_t b0 = (uint8_t)(*basic_getArrayPtr(base + 0));
+    uint8_t b1 = (uint8_t)(*basic_getArrayPtr(base + 1));
+    uint8_t b2 = (uint8_t)(*basic_getArrayPtr(base + 2));
+    uint8_t b3 = (uint8_t)(*basic_getArrayPtr(base + 3));
+    uint8_t rpt = 0;
+    uint8_t mode = (uint8_t)(*basic_getArrayPtr(base + 6));
+    int err = 0;
+
+    // ------------------------------------------------------------
+    // Phase 1:
+    // Wait for the leader LOW (~9ms) in normal system state.
+    //
+    // We do NOT disable interrupts here, because waiting for a key
+    // press could otherwise stop the whole machine too long.
+    // ------------------------------------------------------------
+    {
+        int t_low = ir_measure_pulse_us(gpio, 0, 15000);
+        if (t_low < 8000 || t_low > 10000) {
+            err = 2;
+        } else {
+            // ----------------------------------------------------
+            // Phase 2:
+            // Leader-low detected.
+            // Now protect the timing-critical decode section.
+            // ----------------------------------------------------
+            video_off(0);
+            int save = save_and_disable_interrupts();
+
+            err = ir_decode_nec_after_leader_low(gpio, &b0, &b1, &b2, &b3, &rpt, &mode);
+
+            restore_interrupts(save);
+            video_on();
+        }
+    }
+
+    // ------------------------------------------------------------
+    // Store result into BASIC array
+    // ------------------------------------------------------------
+    *basic_getArrayPtr(base + 0) = b0;
+    *basic_getArrayPtr(base + 1) = b1;
+    *basic_getArrayPtr(base + 2) = b2;
+    *basic_getArrayPtr(base + 3) = b3;
+    *basic_getArrayPtr(base + 4) = rpt;
+    *basic_getArrayPtr(base + 5) = err;
+    *basic_getArrayPtr(base + 6) = mode;
 }
 
 #ifndef NO_KBD_COMMAND
