@@ -17,7 +17,7 @@ An extended version of IchigoJam BASIC for Raspberry Pi Pico with 4KB program si
 
 - Added extended array variable area:
   - Original: [0] – [101]
-  - Extended: [0] – [357]
+  - Extended: [102] – [357]
   - New array region mapped at #C00
 
 - Fixed array-related issues:
