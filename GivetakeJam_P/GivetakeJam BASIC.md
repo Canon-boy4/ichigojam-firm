@@ -1,4 +1,4 @@
-# Givetake BASIC  
+# GivetakeJam BASIC  
 ### Extended IchigoJam BASIC for Raspberry Pi Pico
 
 ![Platform](https://img.shields.io/badge/platform-Raspberry%20Pi%20Pico-blue)
@@ -18,7 +18,7 @@ This firmware enhances program capacity, expands array variables, improves exter
 
 ## 概要
 
-Givetake BASIC は Raspberry Pi Pico 向け IchigoJam BASIC の拡張版です。
+GivetakeJam BASIC は Raspberry Pi Pico 向け IchigoJam BASIC の拡張版です。
 
 プログラム容量の拡張、配列変数の拡張、外部EEPROM対応の改善、赤外線リモコン受信コマンドの追加を行い、従来の IchigoJam BASIC との互換性を維持しています。
 
