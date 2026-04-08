@@ -26,21 +26,21 @@ Givetake BASIC は Raspberry Pi Pico 向け IchigoJam BASIC の拡張版です�
 
 ## Version
 
-`VER()` returns **16110** in this extended build.
+`VER()` returns **16112** in this extended build.
 
 ### Version information
 - `16100` : original base version
-- `16110` : Givetake BASIC extended build
+- `16112` : Givetake BASIC extended build
 
 ---
 
 ## バージョン
 
-この拡張版では、`VER()` の返り値は **16110** です。
+この拡張版では、`VER()` の返り値は **16112** です。
 
 ### バージョン情報
 - `16100` : 元のベース版
-- `16110` : Givetake BASIC 拡張版
+- `16112` : Givetake BASIC 拡張版
 
 ---
 
