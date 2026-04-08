@@ -3,7 +3,7 @@
 
 ![Platform](https://img.shields.io/badge/platform-Raspberry%20Pi%20Pico-blue)
 ![Language](https://img.shields.io/badge/language-BASIC-orange)
-![Version](https://img.shields.io/badge/VER()-16110-brightgreen)
+![Version](https://img.shields.io/badge/VER()-16112-brightgreen)
 ![Status](https://img.shields.io/badge/status-stable-success)
 
 ---

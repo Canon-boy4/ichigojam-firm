@@ -1343,7 +1343,7 @@ static int16 token_expression5() {
 		case TOKEN_VER: {
 			int n = token_opt1();
 			if (n == 0)
-				return IJB_VER * 100 + IJB_BUILD + 10;
+				return IJB_VER * 100 + IJB_BUILD + 12; // VER() 16110 -> 16112
 			if (n == 3)
 				return LANG;
 			if (n == 4)
@@ -3600,8 +3600,8 @@ S_INLINE void command_ws_out(int port) {
 // - The 38kHz carrier is already demodulated by HX1838.
 // - We only measure pulse widths.
 // - Repeat frame preserves previous bytes.
-// - To improve stability, video output + interrupts are disabled
-//   only AFTER leader-low detection.
+// - VIDEO on/off is NOT used here because restoring video caused LCD issues.
+// - Only interrupts are disabled during the timing-critical NEC decode section.
 
 static int ir_wait_level_timeout(int gpio, int level, uint32_t timeout_us) {
     uint32_t st = time_us_32();
@@ -3634,7 +3634,7 @@ static int ir_measure_pulse_us(int gpio, int level, uint32_t timeout_us) {
 // Preconditions:
 // - The first 9ms LOW leader pulse has already been detected.
 // - This function starts from the leader-high period.
-// - Caller may already have disabled video/interrupts.
+// - Caller disables interrupts during this function.
 //
 // Return bytes:
 //   b0,b1,b2,b3 = frame bytes in display order
@@ -3681,13 +3681,15 @@ static int ir_decode_nec_after_leader_low(int gpio, uint8_t* b0, uint8_t* b1, ui
     //   HIGH ~1690us -> 1
     // ------------------------------------------------------------
     for (int i = 0; i < 32; i++) {
-        // low part
+        // low part: about 560us
         t_low = ir_measure_pulse_us(gpio, 0, 2000);
         if (t_low < 250 || t_low > 1000) {
             return 4;
         }
 
-        // high part
+        // high part:
+        //   0 -> about 560us
+        //   1 -> about 1690us
         t_high = ir_measure_pulse_us(gpio, 1, 3000);
         if (t_high < 200) {
             return 5;
@@ -3752,9 +3754,12 @@ static int ir_decode_nec_after_leader_low(int gpio, uint8_t* b0, uint8_t* b1, ui
 }
 
 // ===== MODIFIED (Givetake BASIC) =====
-// Wait for NEC leader-low (~9ms) WITHOUT disabling video/interrupts.
-// Only after leader-low is detected, disable video + interrupts
+// Wait for NEC leader-low (~9ms) in normal system state.
+// Only after leader-low is detected, disable interrupts
 // and decode the rest of the frame.
+//
+// VIDEO on/off is intentionally NOT used here because
+// restoring video caused LCD display problems.
 //
 // Result array:
 //   [base+0] = raw byte 0
@@ -3848,13 +3853,11 @@ S_INLINE void command_ir_in() {
             // Leader-low detected.
             // Now protect the timing-critical decode section.
             // ----------------------------------------------------
-            video_off(0);
             int save = save_and_disable_interrupts();
 
             err = ir_decode_nec_after_leader_low(gpio, &b0, &b1, &b2, &b3, &rpt, &mode);
 
             restore_interrupts(save);
-            video_on();
         }
     }
 

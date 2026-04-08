@@ -73,11 +73,11 @@ An extended version of IchigoJam BASIC for Raspberry Pi Pico with 4KB program si
     - For stable operation, error filtering and repeat filtering are recommended
     - The NEC decode section is protected after leader detection for timing stability
 
-- Updated VER() to 16110 for build identification
+- Updated VER() to 16112 for build identification
   - Example BASIC
     ```sh 
      ? VER()
-     16110
+     16112
     ```
  ---
 
@@ -166,13 +166,13 @@ When `IchigoJam_P.uf2` is created, write it to the Pico.
 ### Checksums
 
 * "SHA-256"
-  `acda7aaff53c36c3e38e938e963c0ca5b4d9f83274c81280892e9f44b1d3cce4`
+  `61860e5e6818e80bd31dc70909b0e5b500e3cb495ddb19fb6f2698dc40066e32`
 
 * "MD5"
-  `ffbf860f5a775dc7a4ff89680fbc472f`
+  `2ffb09348083811a0f3c3518ba52da45`
 
 * "SHA-1"
-  `11e6f17eb6d829a595753a7fc565935d4653f374`
+  `2d34932ca879a46af408d8daa54a3b9b6a9114cf`
 
 ---
 
