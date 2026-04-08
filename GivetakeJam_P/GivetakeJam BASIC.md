@@ -57,7 +57,7 @@ Givetake BASIC は Raspberry Pi Pico 向け IchigoJam BASIC の拡張版です�
 - External EEPROM support (I2C)
 - Improved FILES command behavior
 - Added IR.IN command for NEC infrared reception with HX1838-compatible modules
-- Updated VER() to 16110 for build identification
+- Updated VER() to 16112 for build identification
 - Built-in HELP memory map updated:
   - #000 CHAR
   - #700 PCG
@@ -81,7 +81,7 @@ Givetake BASIC は Raspberry Pi Pico 向け IchigoJam BASIC の拡張版です�
 - 外部拡張 EEPROM をサポートしています。 (I2C)
 - FILES コマンドの挙動を改善しています。
 - HX1838系モジュール向け NEC赤外線受信コマンド IR.IN を追加しています。
-- 拡張版識別のため VER() を 16110 に変更しています。
+- 拡張版識別のため VER() を 16112 に変更しています。
 - HELP コマンドによるメモリーマップ表示を修正しています。
   - #000 CHAR
   - #700 PCG
