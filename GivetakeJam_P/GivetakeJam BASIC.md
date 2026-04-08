@@ -30,7 +30,7 @@ GivetakeJam BASIC は Raspberry Pi Pico 向け IchigoJam BASIC の拡張版で�
 
 ### Version information
 - `16100` : original base version
-- `16112` : Givetake BASIC extended build
+- `16112` : GivetakeJam BASIC extended build
 
 ---
 
@@ -40,7 +40,7 @@ GivetakeJam BASIC は Raspberry Pi Pico 向け IchigoJam BASIC の拡張版で�
 
 ### バージョン情報
 - `16100` : 元のベース版
-- `16112` : Givetake BASIC 拡張版
+- `16112` : GivetakeJam BASIC 拡張版
 
 ---
 
