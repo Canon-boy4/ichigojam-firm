@@ -426,7 +426,8 @@ S_INLINE void command_ws_out(int port);
 
 // ===== MODIFIED (Givetake BASIC) =====
 S_INLINE void command_ir_in();
-
+// AHT20 + BMP280 環境センサー読み取りコマンド
+S_INLINE void command_env_in();
 // token -----------------------------------------------------------------
 
 static uint8 token_getChar();
@@ -632,7 +633,11 @@ int basic_execute(char* commandline) {
 #endif
 			//case TOKEN_WS_OUT:	command_ws_out(1);							break;
 			case TOKEN_WS_LED:	command_ws_out(1);							break; // 7 == LED
-			case TOKEN_IR_IN:	command_ir_in();			 break;
+			// ===== MODIFIED (Givetake BASIC) =====
+			// 
+			case TOKEN_IR_IN:	command_ir_in();				 		break;
+			case TOKEN_ENV_IN:	command_env_in();				 		break;
+
 			default:
 				#ifdef USE_EXTENSION
 				if (extension_command(token.code)) {
@@ -1343,7 +1348,7 @@ static int16 token_expression5() {
 		case TOKEN_VER: {
 			int n = token_opt1();
 			if (n == 0)
-				return IJB_VER * 100 + IJB_BUILD + 12; // VER() 16110 -> 16112
+				return IJB_VER * 100 + IJB_BUILD + 14; // VER() 16110 -> 16114 ENV.IN 追加で+4
 			if (n == 3)
 				return LANG;
 			if (n == 4)
@@ -3871,6 +3876,300 @@ S_INLINE void command_ir_in() {
     *basic_getArrayPtr(base + 4) = rpt;
     *basic_getArrayPtr(base + 5) = err;
     *basic_getArrayPtr(base + 6) = mode;
+}
+
+// ===== MODIFIED (Givetake BASIC) =====
+// ENV.IN コマンド
+//
+// AHT20 から温度・湿度、BMP280 から気圧を読み取る。
+// BMP280 が未接続でも、AHT20 が正常なら正常扱いとする。
+//
+// BASIC書式:
+//   ENV.IN [n]
+//
+// 結果:
+//   [n+0] = 温度 (AHT20, 0.1℃単位)
+//   [n+1] = 湿度 (AHT20, 0.1%RH単位)
+//   [n+2] = 気圧 下位16bit (Pa)
+//   [n+3] = 気圧 上位16bit (Pa)
+//   [n+4] = エラーコード
+//   [n+5] = 状態フラグ
+//
+// 状態フラグ:
+//   bit0 = AHT20 正常
+//   bit1 = BMP280 正常
+//
+// つまり:
+//   [n+5] = 1 -> AHT20のみ正常
+//   [n+5] = 3 -> AHT20 + BMP280 の両方正常
+//
+// エラーコード:
+//   0 = 正常
+//   1 = AHT20 が見つからない
+//   2 = BMP280 が見つからない（※致命エラーにはしない）
+//   3 = AHT20 測定失敗
+//   4 = BMP280 読み出し失敗
+//   5 = BMP280 チップID不正
+
+#define AHT20_ADDR   0x38
+#define BMP280_ADDR0 0x76
+#define BMP280_ADDR1 0x77
+
+static int env_i2c_write(uint8_t addr, const uint8_t* buf, int len) {
+    int res = i2c_write_timeout_us(i2c_default, addr, (uint8_t*)buf, len, false, TIMEOUT_US);
+    return (res == len) ? 0 : -1;
+}
+
+static int env_i2c_read(uint8_t addr, uint8_t* buf, int len) {
+    int res = i2c_read_timeout_us(i2c_default, addr, buf, len, false, TIMEOUT_US);
+    return (res == len) ? 0 : -1;
+}
+
+static int env_i2c_write_read(uint8_t addr, uint8_t reg, uint8_t* buf, int len) {
+    int res = i2c_write_timeout_us(i2c_default, addr, &reg, 1, true, TIMEOUT_US);
+    if (res != 1) return -1;
+    res = i2c_read_timeout_us(i2c_default, addr, buf, len, false, TIMEOUT_US);
+    return (res == len) ? 0 : -1;
+}
+
+static int env_probe(uint8_t addr) {
+    uint8_t dummy;
+    int res = i2c_read_timeout_us(i2c_default, addr, &dummy, 1, false, TIMEOUT_US);
+    return (res == 1) ? 1 : 0;
+}
+
+// ---------- AHT20 ----------
+
+static int env_read_aht20(int16_t* temp_x10, int16_t* hum_x10) {
+    uint8_t cmd[3];
+    uint8_t st;
+    uint8_t data[7];
+
+    if (!env_probe(AHT20_ADDR)) {
+        return 1;
+    }
+
+    // ステータス確認 (0x71)
+    cmd[0] = 0x71;
+    if (env_i2c_write(AHT20_ADDR, cmd, 1) < 0) return 3;
+    if (env_i2c_read(AHT20_ADDR, &st, 1) < 0) return 3;
+
+    // 未校正なら初期化
+    if ((st & 0x18) != 0x18) {
+        cmd[0] = 0xBE;
+        cmd[1] = 0x08;
+        cmd[2] = 0x00;
+        if (env_i2c_write(AHT20_ADDR, cmd, 3) < 0) return 3;
+        sleep_ms(10);
+    }
+
+    // 測定開始
+    cmd[0] = 0xAC;
+    cmd[1] = 0x33;
+    cmd[2] = 0x00;
+    if (env_i2c_write(AHT20_ADDR, cmd, 3) < 0) return 3;
+
+    sleep_ms(80);
+
+    if (env_i2c_read(AHT20_ADDR, data, 7) < 0) return 3;
+
+    // busy bit
+    if (data[0] & 0x80) return 3;
+
+    // 20bit humidity
+    uint32_t raw_h = ((uint32_t)data[1] << 12) |
+                     ((uint32_t)data[2] << 4)  |
+                     ((uint32_t)(data[3] >> 4));
+
+    // 20bit temperature
+    uint32_t raw_t = (((uint32_t)data[3] & 0x0F) << 16) |
+                     ((uint32_t)data[4] << 8) |
+                     ((uint32_t)data[5]);
+
+    // 0.1単位に変換
+    int32_t h10 = (int32_t)((raw_h * 1000UL) >> 20);
+    int32_t t10 = (int32_t)(((raw_t * 2000UL) >> 20) - 500);
+
+    *hum_x10 = (int16_t)h10;
+    *temp_x10 = (int16_t)t10;
+    return 0;
+}
+
+// ---------- BMP280 ----------
+
+typedef struct {
+    uint16_t dig_T1;
+    int16_t  dig_T2;
+    int16_t  dig_T3;
+    uint16_t dig_P1;
+    int16_t  dig_P2;
+    int16_t  dig_P3;
+    int16_t  dig_P4;
+    int16_t  dig_P5;
+    int16_t  dig_P6;
+    int16_t  dig_P7;
+    int16_t  dig_P8;
+    int16_t  dig_P9;
+    int32_t  t_fine;
+    uint8_t  addr;
+} bmp280_cal_t;
+
+static uint16_t env_u16le(const uint8_t* p) {
+    return (uint16_t)p[0] | ((uint16_t)p[1] << 8);
+}
+
+static int16_t env_s16le(const uint8_t* p) {
+    return (int16_t)env_u16le(p);
+}
+
+static int env_bmp280_find_addr(uint8_t* addr_out) {
+    uint8_t id;
+    if (env_i2c_write_read(BMP280_ADDR0, 0xD0, &id, 1) == 0 && id == 0x58) {
+        *addr_out = BMP280_ADDR0;
+        return 0;
+    }
+    if (env_i2c_write_read(BMP280_ADDR1, 0xD0, &id, 1) == 0 && id == 0x58) {
+        *addr_out = BMP280_ADDR1;
+        return 0;
+    }
+    return -1;
+}
+
+static int env_bmp280_read_cal(bmp280_cal_t* c) {
+    uint8_t buf[24];
+
+    if (env_i2c_write_read(c->addr, 0x88, buf, 24) < 0) return -1;
+
+    c->dig_T1 = env_u16le(&buf[0]);
+    c->dig_T2 = env_s16le(&buf[2]);
+    c->dig_T3 = env_s16le(&buf[4]);
+    c->dig_P1 = env_u16le(&buf[6]);
+    c->dig_P2 = env_s16le(&buf[8]);
+    c->dig_P3 = env_s16le(&buf[10]);
+    c->dig_P4 = env_s16le(&buf[12]);
+    c->dig_P5 = env_s16le(&buf[14]);
+    c->dig_P6 = env_s16le(&buf[16]);
+    c->dig_P7 = env_s16le(&buf[18]);
+    c->dig_P8 = env_s16le(&buf[20]);
+    c->dig_P9 = env_s16le(&buf[22]);
+    return 0;
+}
+
+static int32_t env_bmp280_comp_temp(bmp280_cal_t* c, int32_t adc_T) {
+    int32_t var1, var2, T;
+    var1 = ((((adc_T >> 3) - ((int32_t)c->dig_T1 << 1))) * ((int32_t)c->dig_T2)) >> 11;
+    var2 = (((((adc_T >> 4) - ((int32_t)c->dig_T1)) * ((adc_T >> 4) - ((int32_t)c->dig_T1))) >> 12) *
+            ((int32_t)c->dig_T3)) >> 14;
+    c->t_fine = var1 + var2;
+    T = (c->t_fine * 5 + 128) >> 8;   // 0.01℃
+    return T;
+}
+
+static uint32_t env_bmp280_comp_press(bmp280_cal_t* c, int32_t adc_P) {
+    int64_t var1, var2, p;
+    var1 = ((int64_t)c->t_fine) - 128000;
+    var2 = var1 * var1 * (int64_t)c->dig_P6;
+    var2 = var2 + ((var1 * (int64_t)c->dig_P5) << 17);
+    var2 = var2 + (((int64_t)c->dig_P4) << 35);
+    var1 = ((var1 * var1 * (int64_t)c->dig_P3) >> 8) + ((var1 * (int64_t)c->dig_P2) << 12);
+    var1 = (((((int64_t)1) << 47) + var1)) * ((int64_t)c->dig_P1) >> 33;
+
+    if (var1 == 0) return 0;
+
+    p = 1048576 - adc_P;
+    p = (((p << 31) - var2) * 3125) / var1;
+    var1 = (((int64_t)c->dig_P9) * (p >> 13) * (p >> 13)) >> 25;
+    var2 = (((int64_t)c->dig_P8) * p) >> 19;
+    p = ((p + var1 + var2) >> 8) + (((int64_t)c->dig_P7) << 4);
+
+    return (uint32_t)(p >> 8); // Pa
+}
+
+static int env_read_bmp280(int16_t* temp_x10, uint32_t* press_pa) {
+    bmp280_cal_t c;
+    uint8_t cfg[2];
+    uint8_t data[6];
+
+    if (env_bmp280_find_addr(&c.addr) < 0) return 2;
+    if (env_bmp280_read_cal(&c) < 0) return 4;
+
+    // ctrl_meas: temp x1, press x1, normal mode
+    cfg[0] = 0xF4;
+    cfg[1] = 0x27;
+    if (env_i2c_write(c.addr, cfg, 2) < 0) return 4;
+
+    // config: standby 250ms, filter off
+    cfg[0] = 0xF5;
+    cfg[1] = 0x24;
+    if (env_i2c_write(c.addr, cfg, 2) < 0) return 4;
+
+    sleep_ms(20);
+
+    if (env_i2c_write_read(c.addr, 0xF7, data, 6) < 0) return 4;
+
+    int32_t adc_P = ((int32_t)data[0] << 12) | ((int32_t)data[1] << 4) | ((int32_t)data[2] >> 4);
+    int32_t adc_T = ((int32_t)data[3] << 12) | ((int32_t)data[4] << 4) | ((int32_t)data[5] >> 4);
+
+    int32_t t100 = env_bmp280_comp_temp(&c, adc_T);
+    uint32_t ppa = env_bmp280_comp_press(&c, adc_P);
+
+    *temp_x10 = (int16_t)(t100 / 10); // 0.1℃
+    *press_pa = ppa;
+    return 0;
+}
+
+// ---------- command ----------
+
+S_INLINE void command_env_in() {
+    Token t; Token_get(t);
+    if (t.code != TOKEN_ARRAY) {
+        command_error(ERR_SYNTAX_ERROR);
+        return;
+    }
+
+    int base = token_getArrayIndex();
+    IJB_ERR_CHK();
+
+    token_end();
+    IJB_ERR_CHK();
+
+    // [base] .. [base+5] を使用
+    if (base < 0 || base + 5 >= IJB_SIZEOF_ARRAY_MAX) {
+        command_error(ERR_INDEX_OUT_OF_RANGE);
+        return;
+    }
+
+    i2c0_init();
+
+    int16_t aht_t10 = 0;
+    int16_t hum10 = 0;
+    int16_t bmp_t10 = 0;
+    uint32_t press = 0;
+
+    int err = 0;
+    int aht_ok = 0;
+    int bmp_ok = 0;
+
+    // AHT20 は必須
+    err = env_read_aht20(&aht_t10, &hum10);
+    if (err == 0) {
+        aht_ok = 1;
+
+        // BMP280 は任意
+        if (env_read_bmp280(&bmp_t10, &press) == 0) {
+            bmp_ok = 1;
+        }
+
+        // BMP280 が無くても AHT20 が成功していれば正常扱い
+        err = 0;
+    }
+
+    *basic_getArrayPtr(base + 0) = aht_t10;                    // 温度 0.1℃
+    *basic_getArrayPtr(base + 1) = hum10;                      // 湿度 0.1%RH
+    *basic_getArrayPtr(base + 2) = (int16_t)(press & 0xffff);  // 気圧下位
+    *basic_getArrayPtr(base + 3) = (int16_t)((press >> 16) & 0xffff); // 気圧上位
+    *basic_getArrayPtr(base + 4) = err;                        // 致命エラーのみ
+    *basic_getArrayPtr(base + 5) = (aht_ok ? 1 : 0) | (bmp_ok ? 2 : 0); // 状態フラグ
 }
 
 #ifndef NO_KBD_COMMAND
