@@ -146,9 +146,9 @@ make
     - IchigoJam P の時の様にビルドして、`IchigoJam_P.uf2`ファイルが作成できたらpicoに書き込みます。
     - IchigoJam_P.uf2: 4K版のファームウェアファイルです。
     - チェックサム
-      SHA-256: 8C5F00629A0658B1B815B549B754F257A34DDB45CAFC131F4E4AB596C037569B
-      MD5: 327331C46DDF7C06408C4E95AA98D395
-      SHA-1: C8544B114B293DBF27BD3738DC0F289F317FA6C4
+      SHA-256: 61860e5e6818e80bd31dc70909b0e5b500e3cb495ddb19fb6f2698dc40066e32
+      MD5: 2ffb09348083811a0f3c3518ba52da45
+      SHA-1: 2d34932ca879a46af408d8daa54a3b9b6a9114cf
     
     - ARRAY_VAR_TOTAL_TEST.BAS: 配列変数のテストプログラムです。このテストが ALL OK で通ることを確認しています。
 
