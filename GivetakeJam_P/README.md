@@ -79,26 +79,24 @@ This version enhances functionality while maintaining compatibility with the ori
 
 - Syntax:
 ``sh
-ENV.IN [n]
-
-- Description:
-- Receives measurement data from the AHT20 and BMP280 connected to the I2C line and stores the decoded result in an array variable starting with [n].
-
-- Result Storage Location
-- [n+0] = Temperature (AHT20, 0.1°C units)
-- [n+1] = Humidity (AHT20, 0.1%RH units)
-- [n+2] = Atmospheric Pressure, Lower 16 bits (Pa)
-- [n+3] = Atmospheric Pressure, Upper 16 bits (Pa)
-- [n+4] = Error Code
-- 0 = Normal
-- 1 = AHT20 not found
-- 2 = BMP280 not found (※Not a fatal error)
-- 3 = AHT20 measurement failed
-- 4 = BMP280 read failed
-- 5 = BMP280 chip ID invalid
-- [n+5] = Status Flag
-- bit0 = AHT20 Normal
-- bit1 = BMP280 Normal
+      ENV.IN [n]
+  - Description:
+   Receives measurement data from the AHT20 and BMP280 connected to the I2C line and stores the decoded result in an array variable starting with [n].
+  - Result Storage Location
+    - [n+0] = Temperature (AHT20, 0.1°C units)
+    - [n+1] = Humidity (AHT20, 0.1%RH units)
+    - [n+2] = Atmospheric Pressure (BMP280, 0.1hPa units)
+    - [n+3] = Temperature (BMP280, 0.1°C units)
+    - [n+4] = Error Code
+      - 0 = Normal
+      - 1 = AHT20 not found
+      - 2 = BMP280 not found (※Not a fatal error)
+      - 3 = AHT20 measurement failed
+      - 4 = BMP280 read failed
+      - 5 = BMP280 chip ID invalid
+    - [n+5] = Status Flag
+      - bit0 = AHT20 Normal
+      - bit1 = BMP280 Normal
 - Example Program: ENV_IN_TEST.BAS
 
 - Updated VER() to 16112 for build identification
@@ -194,13 +192,13 @@ When `IchigoJam_P.uf2` is created, write it to the Pico.
 ### Checksums
 
 * "SHA-256"
-  `61860e5e6818e80bd31dc70909b0e5b500e3cb495ddb19fb6f2698dc40066e32`
+  `8C5F00629A0658B1B815B549B754F257A34DDB45CAFC131F4E4AB596C037569B`
 
 * "MD5"
-  `2ffb09348083811a0f3c3518ba52da45`
+  `327331C46DDF7C06408C4E95AA98D395`
 
 * "SHA-1"
-  `2d34932ca879a46af408d8daa54a3b9b6a9114cf`
+  `C8544B114B293DBF27BD3738DC0F289F317FA6C4`
 
 ---
 

@@ -127,7 +127,16 @@ S_INLINE void ws_out(int port, int nled, int reapeat);
 
 // ===== MODIFIED (Givetake BASIC) =====
 //S_INLINE void ir_in(int port);
-static int ir_port_to_gpio(int port);
+// BASIC の INポート番号を GPIO番号へ変換
+static int ir_port_to_gpio(int port) {
+    switch (port) {
+        case 1: return 27; // IN1
+        case 2: return 26; // IN2
+        case 3: return 6;  // IN3
+        case 4: return 7;  // IN4
+        default: return -1;
+    }
+}
 
 // util -----------------------------------------------------
 
@@ -3883,58 +3892,37 @@ S_INLINE void command_ir_in() {
 //
 // AHT20 から温度・湿度、BMP280 から気圧を読み取る。
 // BMP280 が未接続でも、AHT20 が正常なら正常扱いとする。
-//
-// BASIC書式:
-//   ENV.IN [n]
-//
-// 結果:
-//   [n+0] = 温度 (AHT20, 0.1℃単位)
-//   [n+1] = 湿度 (AHT20, 0.1%RH単位)
-//   [n+2] = 気圧 下位16bit (Pa)
-//   [n+3] = 気圧 上位16bit (Pa)
-//   [n+4] = エラーコード
-//   [n+5] = 状態フラグ
-//
-// 状態フラグ:
-//   bit0 = AHT20 正常
-//   bit1 = BMP280 正常
-//
-// つまり:
-//   [n+5] = 1 -> AHT20のみ正常
-//   [n+5] = 3 -> AHT20 + BMP280 の両方正常
-//
-// エラーコード:
-//   0 = 正常
-//   1 = AHT20 が見つからない
-//   2 = BMP280 が見つからない（※致命エラーにはしない）
-//   3 = AHT20 測定失敗
-//   4 = BMP280 読み出し失敗
-//   5 = BMP280 チップID不正
 
 #define AHT20_ADDR   0x38
 #define BMP280_ADDR0 0x76
 #define BMP280_ADDR1 0x77
 
+// ===== MODIFIED (Givetake BASIC) =====
+// ENV.IN 用 I2C タイムアウト
+#ifndef ENV_I2C_TIMEOUT_US
+#define ENV_I2C_TIMEOUT_US 100000
+#endif
+
 static int env_i2c_write(uint8_t addr, const uint8_t* buf, int len) {
-    int res = i2c_write_timeout_us(i2c_default, addr, (uint8_t*)buf, len, false, TIMEOUT_US);
+    int res = i2c_write_timeout_us(i2c_default, addr, (uint8_t*)buf, len, false, ENV_I2C_TIMEOUT_US);
     return (res == len) ? 0 : -1;
 }
 
 static int env_i2c_read(uint8_t addr, uint8_t* buf, int len) {
-    int res = i2c_read_timeout_us(i2c_default, addr, buf, len, false, TIMEOUT_US);
+    int res = i2c_read_timeout_us(i2c_default, addr, buf, len, false, ENV_I2C_TIMEOUT_US);
     return (res == len) ? 0 : -1;
 }
 
 static int env_i2c_write_read(uint8_t addr, uint8_t reg, uint8_t* buf, int len) {
-    int res = i2c_write_timeout_us(i2c_default, addr, &reg, 1, true, TIMEOUT_US);
+    int res = i2c_write_timeout_us(i2c_default, addr, &reg, 1, true, ENV_I2C_TIMEOUT_US);
     if (res != 1) return -1;
-    res = i2c_read_timeout_us(i2c_default, addr, buf, len, false, TIMEOUT_US);
+    res = i2c_read_timeout_us(i2c_default, addr, buf, len, false, ENV_I2C_TIMEOUT_US);
     return (res == len) ? 0 : -1;
 }
 
 static int env_probe(uint8_t addr) {
     uint8_t dummy;
-    int res = i2c_read_timeout_us(i2c_default, addr, &dummy, 1, false, TIMEOUT_US);
+    int res = i2c_read_timeout_us(i2c_default, addr, &dummy, 1, false, ENV_I2C_TIMEOUT_US);
     return (res == 1) ? 1 : 0;
 }
 
@@ -3949,12 +3937,10 @@ static int env_read_aht20(int16_t* temp_x10, int16_t* hum_x10) {
         return 1;
     }
 
-    // ステータス確認 (0x71)
     cmd[0] = 0x71;
     if (env_i2c_write(AHT20_ADDR, cmd, 1) < 0) return 3;
     if (env_i2c_read(AHT20_ADDR, &st, 1) < 0) return 3;
 
-    // 未校正なら初期化
     if ((st & 0x18) != 0x18) {
         cmd[0] = 0xBE;
         cmd[1] = 0x08;
@@ -3963,7 +3949,6 @@ static int env_read_aht20(int16_t* temp_x10, int16_t* hum_x10) {
         sleep_ms(10);
     }
 
-    // 測定開始
     cmd[0] = 0xAC;
     cmd[1] = 0x33;
     cmd[2] = 0x00;
@@ -3972,21 +3957,16 @@ static int env_read_aht20(int16_t* temp_x10, int16_t* hum_x10) {
     sleep_ms(80);
 
     if (env_i2c_read(AHT20_ADDR, data, 7) < 0) return 3;
-
-    // busy bit
     if (data[0] & 0x80) return 3;
 
-    // 20bit humidity
     uint32_t raw_h = ((uint32_t)data[1] << 12) |
                      ((uint32_t)data[2] << 4)  |
                      ((uint32_t)(data[3] >> 4));
 
-    // 20bit temperature
     uint32_t raw_t = (((uint32_t)data[3] & 0x0F) << 16) |
                      ((uint32_t)data[4] << 8) |
                      ((uint32_t)data[5]);
 
-    // 0.1単位に変換
     int32_t h10 = (int32_t)((raw_h * 1000UL) >> 20);
     int32_t t10 = (int32_t)(((raw_t * 2000UL) >> 20) - 500);
 
@@ -4061,7 +4041,7 @@ static int32_t env_bmp280_comp_temp(bmp280_cal_t* c, int32_t adc_T) {
     var2 = (((((adc_T >> 4) - ((int32_t)c->dig_T1)) * ((adc_T >> 4) - ((int32_t)c->dig_T1))) >> 12) *
             ((int32_t)c->dig_T3)) >> 14;
     c->t_fine = var1 + var2;
-    T = (c->t_fine * 5 + 128) >> 8;   // 0.01℃
+    T = (c->t_fine * 5 + 128) >> 8;
     return T;
 }
 
@@ -4082,7 +4062,7 @@ static uint32_t env_bmp280_comp_press(bmp280_cal_t* c, int32_t adc_P) {
     var2 = (((int64_t)c->dig_P8) * p) >> 19;
     p = ((p + var1 + var2) >> 8) + (((int64_t)c->dig_P7) << 4);
 
-    return (uint32_t)(p >> 8); // Pa
+    return (uint32_t)(p >> 8);
 }
 
 static int env_read_bmp280(int16_t* temp_x10, uint32_t* press_pa) {
@@ -4093,12 +4073,10 @@ static int env_read_bmp280(int16_t* temp_x10, uint32_t* press_pa) {
     if (env_bmp280_find_addr(&c.addr) < 0) return 2;
     if (env_bmp280_read_cal(&c) < 0) return 4;
 
-    // ctrl_meas: temp x1, press x1, normal mode
     cfg[0] = 0xF4;
     cfg[1] = 0x27;
     if (env_i2c_write(c.addr, cfg, 2) < 0) return 4;
 
-    // config: standby 250ms, filter off
     cfg[0] = 0xF5;
     cfg[1] = 0x24;
     if (env_i2c_write(c.addr, cfg, 2) < 0) return 4;
@@ -4113,7 +4091,7 @@ static int env_read_bmp280(int16_t* temp_x10, uint32_t* press_pa) {
     int32_t t100 = env_bmp280_comp_temp(&c, adc_T);
     uint32_t ppa = env_bmp280_comp_press(&c, adc_P);
 
-    *temp_x10 = (int16_t)(t100 / 10); // 0.1℃
+    *temp_x10 = (int16_t)(t100 / 10);
     *press_pa = ppa;
     return 0;
 }
@@ -4146,6 +4124,8 @@ S_INLINE void command_env_in() {
     int16_t bmp_t10 = 0;
     uint32_t press = 0;
 
+    int16_t press_x10hpa = 0;
+
     int err = 0;
     int aht_ok = 0;
     int bmp_ok = 0;
@@ -4158,17 +4138,22 @@ S_INLINE void command_env_in() {
         // BMP280 は任意
         if (env_read_bmp280(&bmp_t10, &press) == 0) {
             bmp_ok = 1;
+
+            // ===== MODIFIED (Givetake BASIC) =====
+            // 気圧は BASIC で扱いやすいように 0.1hPa 単位で返す
+            // 例: 100124Pa -> 10012
+            press_x10hpa = (int16_t)(press / 10);
         }
 
         // BMP280 が無くても AHT20 が成功していれば正常扱い
         err = 0;
     }
 
-    *basic_getArrayPtr(base + 0) = aht_t10;                    // 温度 0.1℃
-    *basic_getArrayPtr(base + 1) = hum10;                      // 湿度 0.1%RH
-    *basic_getArrayPtr(base + 2) = (int16_t)(press & 0xffff);  // 気圧下位
-    *basic_getArrayPtr(base + 3) = (int16_t)((press >> 16) & 0xffff); // 気圧上位
-    *basic_getArrayPtr(base + 4) = err;                        // 致命エラーのみ
+    *basic_getArrayPtr(base + 0) = aht_t10;                        // 温度 0.1℃
+    *basic_getArrayPtr(base + 1) = hum10;                          // 湿度 0.1%RH
+    *basic_getArrayPtr(base + 2) = press_x10hpa;                  // 気圧 0.1hPa
+    *basic_getArrayPtr(base + 3) = bmp_t10;                       // BMP280温度 0.1℃
+    *basic_getArrayPtr(base + 4) = err;                           // 致命エラーのみ
     *basic_getArrayPtr(base + 5) = (aht_ok ? 1 : 0) | (bmp_ok ? 2 : 0); // 状態フラグ
 }
 

@@ -159,7 +159,7 @@
 // Example:
 //   \007WS.LED  -> 6 chars
 //   \006IR.IN   -> 5 chars
-//   \006IR.IN   -> 5 chars
+//   \007ENV.IN   -> 6 chars
 
 // ===== MODIFIED (Givetake BASIC) =====
 // "ENV.IN" を "IR.IN" の次に追加
