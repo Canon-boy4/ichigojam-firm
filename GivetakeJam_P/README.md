@@ -5,7 +5,8 @@
 ![Version](https://img.shields.io/badge/version-v1.6.1-brightgreen)
 ![Status](https://img.shields.io/badge/status-stable-success)
 
-An extended version of IchigoJam BASIC for Raspberry Pi Pico with 4KB program size, expanded array variables, improved external EEPROM support, and adds a NEC infrared receiver command.
+
+This version enhances functionality while maintaining compatibility with the original IchigoJam P BASIC by expanding program capacity, expanding array variables, improving external EEPROM support, and adding NEC-style infrared reception commands and environmental measurement commands.
 
 ---
 
@@ -73,11 +74,38 @@ An extended version of IchigoJam BASIC for Raspberry Pi Pico with 4KB program si
     - For stable operation, error filtering and repeat filtering are recommended
     - The NEC decode section is protected after leader detection for timing stability
 
+
+- Added the command ENV.IN to measure temperature, humidity, and atmospheric pressure using the AHT20 and BMP280 modules.
+
+- Syntax:
+``sh
+ENV.IN [n]
+
+- Description:
+- Receives measurement data from the AHT20 and BMP280 connected to the I2C line and stores the decoded result in an array variable starting with [n].
+
+- Result Storage Location
+- [n+0] = Temperature (AHT20, 0.1°C units)
+- [n+1] = Humidity (AHT20, 0.1%RH units)
+- [n+2] = Atmospheric Pressure, Lower 16 bits (Pa)
+- [n+3] = Atmospheric Pressure, Upper 16 bits (Pa)
+- [n+4] = Error Code
+- 0 = Normal
+- 1 = AHT20 not found
+- 2 = BMP280 not found (※Not a fatal error)
+- 3 = AHT20 measurement failed
+- 4 = BMP280 read failed
+- 5 = BMP280 chip ID invalid
+- [n+5] = Status Flag
+- bit0 = AHT20 Normal
+- bit1 = BMP280 Normal
+- Example Program: ENV_IN_TEST.BAS
+
 - Updated VER() to 16112 for build identification
   - Example BASIC
     ```sh 
      ? VER()
-     16112
+     16114
     ```
  ---
 
@@ -251,4 +279,4 @@ For details, see:
 ![Downloads](https://img.shields.io/github/downloads/IchigoJam/ichigojam-firm/total)
 
 Givetakewinwin
-Created on April 5, 2026
+Created on May 29, 2026

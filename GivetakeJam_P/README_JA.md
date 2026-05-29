@@ -5,7 +5,7 @@
 ![Version](https://img.shields.io/badge/version-v1.6.1-brightgreen)
 ![Status](https://img.shields.io/badge/status-stable-success)
 
-##  プログラム容量の拡張、配列変数の拡張、外部EEPROM対応の改善、NEC方式の赤外線受信コマンドの追加を行い、従来のIchigoJam P BASICの互換性を維持しながら機能強化しています。
+##  プログラム容量の拡張、配列変数の拡張、外部EEPROM対応の改善、NEC方式の赤外線受信コマンド、環境測定コマンドの追加を行い、従来のIchigoJam P BASICの互換性を維持しながら機能強化しています。
 
 ## 機能 / 変更点
 - プログラム容量を 1024 → 4096バイト に拡張
@@ -66,11 +66,34 @@
     - 安定動作のため、エラー除外と repeat除外を推奨します
     - リーダーコード検出後の NECデコード区間では、安定化のため割り込みの影響を抑えています
 
-- 拡張版識別のため VER() を 16112 に変更
+- AHT20とBMP280モジュールを使って温湿度と気圧を測定するコマンド ENV.IN を追加
+  - 書式
+    ```sh
+      ENV.IN [n]
+  - 説明
+    - I2CラインにつないだAHT20とBMP280から 測定データを受信し、デコード結果を [n] から始まる配列変数に格納します。
+  - 結果の格納先
+    - [n+0] = 温度 (AHT20, 0.1℃単位)
+    - [n+1] = 湿度 (AHT20, 0.1%RH単位)
+    - [n+2] = 気圧 下位16bit (Pa)
+    - [n+3] = 気圧 上位16bit (Pa)
+    - [n+4] = エラー コード
+      - 0 = 正常
+      - 1 = AHT20 が見つからない
+      - 2 = BMP280 が見つからない（※致命エラーにはしない）
+      - 3 = AHT20 測定失敗
+      - 4 = BMP280 読み出し失敗
+      - 5 = BMP280 チップID不正
+    - [n+5] = 状態フラグ
+      - bit0 = AHT20 正常
+      - bit1 = BMP280 正常
+  - 使用例 プログラム ENV_IN_TEST.BAS
+
+- 拡張版識別のため VER() を 16114 に変更
   - 使用例 BASIC
     ```sh 
      ? VER()
-     16112
+     16114
     ```
 
 ---
@@ -162,6 +185,6 @@ make
 - IR受信を安定させるため、BASIC側で repeat 除外を推奨します
 
 ギブテクウインウイン
-2026/4/5 作成  
+2026/5/29 作成  
 ![Release](https://img.shields.io/github/v/release/IchigoJam/ichigojam-firm)
 ![Downloads](https://img.shields.io/github/downloads/IchigoJam/ichigojam-firm/total)

@@ -3,7 +3,7 @@
 
 ![Platform](https://img.shields.io/badge/platform-Raspberry%20Pi%20Pico-blue)
 ![Language](https://img.shields.io/badge/language-BASIC-orange)
-![Version](https://img.shields.io/badge/VER()-16112-brightgreen)
+![Version](https://img.shields.io/badge/VER()-16114-brightgreen)
 ![Status](https://img.shields.io/badge/status-stable-success)
 
 ---
@@ -12,7 +12,7 @@
 
 GivetakeJam BASIC is an extended version of IchigoJam BASIC for Raspberry Pi Pico.
 
-This firmware enhances program capacity, expands array variables, improves external EEPROM handling, and adds a new infrared receiver command while maintaining compatibility with the original IchigoJam BASIC design.
+This firmware enhances program capacity, expands array variables, improves external EEPROM handling, and adds a new infrared receiver command, environmental measurement command while maintaining compatibility with the original IchigoJam BASIC design.
 
 ---
 
@@ -20,27 +20,29 @@ This firmware enhances program capacity, expands array variables, improves exter
 
 GivetakeJam BASIC は Raspberry Pi Pico 向け IchigoJam BASIC の拡張版です。
 
-プログラム容量の拡張、配列変数の拡張、外部EEPROM対応の改善、赤外線リモコン受信コマンドの追加を行い、従来の IchigoJam BASIC との互換性を維持しています。
+プログラム容量の拡張、配列変数の拡張、外部EEPROM対応の改善、赤外線リモコン受信コマンド、環境測定コマンドの追加を行い、従来の IchigoJam BASIC との互換性を維持しています。
 
 ---
 
 ## Version
 
-`VER()` returns **16112** in this extended build.
+`VER()` returns **16114** in this extended build.
 
 ### Version information
 - `16100` : original base version
-- `16112` : GivetakeJam BASIC extended build
+- `16112` : GivetakeJam BASIC extended build (infrared receiver)
+- `16114` : GivetakeJam BASIC extended build (environmental measurement)
 
 ---
 
 ## バージョン
 
-この拡張版では、`VER()` の返り値は **16112** です。
+この拡張版では、`VER()` の返り値は **16114** です。
 
 ### バージョン情報
 - `16100` : 元のベース版
-- `16112` : GivetakeJam BASIC 拡張版
+- `16112` : GivetakeJam BASIC 拡張版 (赤外線受信)
+- `16114` : GivetakeJam BASIC 拡張版 (環境測定)
 
 ---
 
@@ -57,6 +59,7 @@ GivetakeJam BASIC は Raspberry Pi Pico 向け IchigoJam BASIC の拡張版で�
 - External EEPROM support (I2C)
 - Improved FILES command behavior
 - Added IR.IN command for NEC infrared reception with HX1838-compatible modules
+- Added ENV.IN command to measure temperature, humidity, and atmospheric pressure using the AHT20 and BMP280 modules
 - Updated VER() to 16112 for build identification
 - Built-in HELP memory map updated:
   - #000 CHAR
@@ -81,7 +84,8 @@ GivetakeJam BASIC は Raspberry Pi Pico 向け IchigoJam BASIC の拡張版で�
 - 外部拡張 EEPROM をサポートしています。 (I2C)
 - FILES コマンドの挙動を改善しています。
 - HX1838系モジュール向け NEC赤外線受信コマンド IR.IN を追加しています。
-- 拡張版識別のため VER() を 16112 に変更しています。
+- AHT20とBMP280モジュールを使って温湿度と気圧を測定するコマンド ENV.IN を追加しています。
+- 拡張版識別のため VER() を 16114 に変更しています。
 - HELP コマンドによるメモリーマップ表示を修正しています。
   - #000 CHAR
   - #700 PCG
