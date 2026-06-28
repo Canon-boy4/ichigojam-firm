@@ -22,9 +22,27 @@
 
 //ラズパイの動作クロックは252MHz(PicoDVIでオーバークロックしている)、IchigoJamのPWMは1周期20msなので50Hz
 //https://rikei-tawamure.com/entry/2021/02/08/213335#PWM%E7%94%A8%E3%82%AB%E3%82%A6%E3%83%B3%E3%82%BF PWMの計算方法は左記参照
-#define PICO_CLOCK_FREQ (DVI_TIMING.bit_clk_khz * 1000)
-#define CLKDIV (PICO_CLOCK_FREQ / (1000 * 1000))//=252
-#define PWM_WRAP (PICO_CLOCK_FREQ / (CLKDIV * 50) - 1)
+
+//#define PICO_CLOCK_FREQ (DVI_TIMING.bit_clk_khz * 1000)
+//#define CLKDIV (PICO_CLOCK_FREQ / (1000 * 1000))//=252
+//#define PWM_WRAP (PICO_CLOCK_FREQ / (CLKDIV * 50) - 1)
+// PWM用設定
+// Pico 2 DVIなし版は標準125MHz動作を前提にする。
+// Pico / RP2040版はDVI動作時のクロックを使用する。
+
+#ifdef PICO_RP2350
+
+#define PICO_CLOCK_FREQ 125000000u
+#define CLKDIV          125.0f
+#define PWM_WRAP        19999u
+
+#else
+
+#define PICO_CLOCK_FREQ (DVI_TIMING.bit_clk_khz * 1000u)
+#define CLKDIV          ((float)PICO_CLOCK_FREQ / 1000000.0f)
+#define PWM_WRAP        ((uint16_t)(PICO_CLOCK_FREQ / (CLKDIV * 50.0f) - 1.0f))
+
+#endif
 
 static uint8 in_pins[] = { IN1, IN2, IN3, IN4, OUT1, OUT2, OUT3, OUT4, BTN, OUT5, OUT6 };
 static uint8 out_pins[] = { OUT1, OUT2, OUT3, OUT4, OUT5, OUT6, LED, IN1, IN2, IN3, IN4 };
@@ -42,6 +60,7 @@ void IJB_pwm(int port, int plen, int len) {
     uint8 pin = out_pins[port - 1];
     gpio_set_function(pin, GPIO_FUNC_PWM);
     uint slice_num = pwm_gpio_to_slice_num(pin);
+
     pwm_set_clkdiv(slice_num, CLKDIV);
     pwm_set_wrap(slice_num, PWM_WRAP);
     pwm_set_gpio_level(pin, (PWM_WRAP + 1) * plen / PLEN_MAX);

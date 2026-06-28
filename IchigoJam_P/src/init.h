@@ -23,6 +23,8 @@
 #define UART_RX_PIN 1
 
 //pico
+
+#ifndef PICO_RP2350
 static uint16_t framebuf[FRAME_MAX_WIDTH * FRAME_MAX_HEIGHT];
 
 void core1_main() {
@@ -121,6 +123,8 @@ void vram_to_framebuf_all(bool visible_cursor) {
     }
 }
 
+#endif
+
 //hid_app.cが複雑になってるので、もっと簡潔に処理できるなら直したい
 void putc_long_press_key() {
     int save = save_and_disable_interrupts();//割り込みを止めないとなぜかtime-us-64() - lp.last_key_report_timeがオーバーフローする時がある
@@ -139,9 +143,13 @@ bool timer(repeating_timer_t* rt) {
     frames++;
     psg_tick();
     set_tone();
+
+#ifndef PICO_RP2350
     if (video_active()) {
         vram_to_framebuf_all(_g.cursorflg);
     }
+#endif
+
     //中でsleep_ms()が呼ばれたときに止まるので、本来タイマーの中でtuh_task()を呼び出してはいけないが、なぜかPicoDVIを動かしていると止まらない
     //pico-sdk/lib/tinyusb/src/osal/osal_pico.h　のosal_task_delay()のsleepをwhileループに置き換えるとPicoDVIなしで一応解決する
     tuh_task();
@@ -184,7 +192,11 @@ void pico_init() {
     set_sys_clock_khz(12000, true);
 #else
     // Run system at TMDS bit clock
+
+#ifndef PICO_RP2350
     set_sys_clock_khz(DVI_TIMING.bit_clk_khz, true);
+#endif
+
 #endif
 
     stdio_uart_init();//クロックを変えてから初期化する
@@ -207,6 +219,7 @@ void pico_init() {
     add_repeating_timer_us(-16666, timer, NULL, &out);//60FPS
 }
 
+#ifndef PICO_RP2350
 void picodvi_init() {
     dvi0.timing = &DVI_TIMING;
     dvi0.ser_cfg = DVI_DEFAULT_SERIAL_CONFIG;
@@ -224,6 +237,7 @@ void picodvi_init() {
 
     multicore_launch_core1(core1_main);
 }
+#endif
 
 void ichigojam_init() {
     //SCREEN_W,SCREEN_Hはグローバル変数に置換されるので、基本的にSCREEN_W等を介してアクセスする

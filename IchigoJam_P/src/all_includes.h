@@ -23,18 +23,26 @@
 #include "hardware/i2c.h"
 
 //pico-extras
+
+#ifndef PICO_RP2350
 #include "pico/sleep.h"
 #include "hardware/rosc.h"
+#endif
 
 //PicoDVI
+
+#ifndef PICO_RP2350
 #include "dvi.h"
 #include "common_dvi_pin_configs.h"
 #include "sprite.h"
+#endif
 
 #include "tusb.h"
 #include "hid.h"
 
+#ifndef PICO_RP2350
 #define DVI_TIMING dvi_timing_640x480p_60hz
+#endif
 
 // for IchigoJam BASIC
 #define NO_MEMCPY

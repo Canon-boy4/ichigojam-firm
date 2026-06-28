@@ -27,7 +27,11 @@ STATIC void exec(char* s) {
 
 int main() {
     pico_init();
+
+#ifndef PICO_RP2350
     picodvi_init();
+#endif
+
     ichigojam_init();
 
     char* linebuf = (char*)ram + OFFSET_RAM_LINEBUF;
