@@ -3,3 +3,8 @@ pico-sdk/
 pico-extras/
 PicoDVI/
 build/
+
+# Pico 2 / RP2350 development environment
+pico-sdk-rp2350/
+pico-extras-rp2350/
+build-pico2/
