@@ -26,8 +26,10 @@ target_link_libraries(IchigoJam_P PUBLIC
     pico_stdlib
     pico_multicore
     pico_util
+    pico_sync
     tinyusb_host
     tinyusb_board
+    hardware_dma
     hardware_flash
     hardware_watchdog
     hardware_adc

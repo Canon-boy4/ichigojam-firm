@@ -125,6 +125,76 @@ void vram_to_framebuf_all(bool visible_cursor) {
 
 #endif
 
+#ifdef PICO_RP2350
+
+#define HSTX_BG_COLOUR 0x00
+#define HSTX_FG_COLOUR 0xFF
+
+void vram_to_hstx_all(bool visible_cursor) {
+    const int mag = 1 << _g.screen_big;
+
+    const int dot_size = 2 * mag;
+    const int margin_x = MARGIN_WIDTH * 2;
+    const int margin_y = MARGIN_HEIGHT * 2;
+
+    // ここで hstx_video_fill() 黒塗りにしない
+
+    for (int vram_y = 0; vram_y < SCREEN_H; vram_y++) {
+        for (int font_y = 0; font_y < FONT_SIZE; font_y++) {
+            const int dst_y =
+                margin_y +
+                (vram_y * FONT_SIZE + font_y) * dot_size;
+
+            // dot_size行ぶん、同じ文字ラインを描く。
+            for (int repeat_y = 0; repeat_y < dot_size; repeat_y++) {
+                uint8_t *dst = &hstx_framebuf[
+                    (dst_y + repeat_y) * HSTX_MODE_H_ACTIVE_PIXELS + margin_x
+                ];
+
+                for (int vram_x = 0; vram_x < SCREEN_W; vram_x++) {
+                    uint8_t ch = vram[vram_y * SCREEN_W + vram_x];
+
+                    uint8_t char_line =
+                        CHAR_PATTERN[ch * FONT_SIZE + font_y];
+
+                    if (ch >= 0xE0) {
+                        char_line =
+                            screen_pcg[
+                                (ch - 0xE0) * FONT_SIZE + font_y
+                            ];
+                    }
+
+                    // VIDEO命令による白黒反転
+                    char_line ^= 0xFF * _g.screen_invert;
+
+                    // カーソルの点滅・反転
+                    if (((frames >> 4) & visible_cursor) &&
+                        _g.cursorx == vram_x &&
+                        _g.cursory == vram_y) {
+
+                        char_line ^=
+                            key_flg.insert ? 0xFF : 0xF0;
+                    }
+
+                    // フォント1行の8ドットを、横方向へdot_size倍に展開する。
+                    for (int font_x = 0; font_x < FONT_SIZE; font_x++) {
+                        uint8_t colour =
+                            ((char_line >> (7 - font_x)) & 1)
+                            ? HSTX_FG_COLOUR
+                            : HSTX_BG_COLOUR;
+
+                        for (int repeat_x = 0; repeat_x < dot_size; repeat_x++) {
+                            *dst++ = colour;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+#endif  // PICO_RP2350
+
 //hid_app.cが複雑になってるので、もっと簡潔に処理できるなら直したい
 void putc_long_press_key() {
     int save = save_and_disable_interrupts();//割り込みを止めないとなぜかtime-us-64() - lp.last_key_report_timeがオーバーフローする時がある
@@ -144,16 +214,24 @@ bool timer(repeating_timer_t* rt) {
     psg_tick();
     set_tone();
 
-#ifndef PICO_RP2350
     if (video_active()) {
-        vram_to_framebuf_all(_g.cursorflg);
+#ifdef PICO_RP2350
+    static uint8_t hstx_draw_div = 0;
+
+    hstx_draw_div++;
+    if ((hstx_draw_div & 1) == 0) {
+        vram_to_hstx_all(_g.cursorflg);
     }
+#else
+    vram_to_framebuf_all(_g.cursorflg);
 #endif
+    }
 
     //中でsleep_ms()が呼ばれたときに止まるので、本来タイマーの中でtuh_task()を呼び出してはいけないが、なぜかPicoDVIを動かしていると止まらない
     //pico-sdk/lib/tinyusb/src/osal/osal_pico.h　のosal_task_delay()のsleepをwhileループに置き換えるとPicoDVIなしで一応解決する
     tuh_task();
     putc_long_press_key();
+
     return true;
 }
 
@@ -203,6 +281,7 @@ void pico_init() {
     // uart_set_hw_flow(UART_ID, false, false);//いる？
     // uart_set_fifo_enabled(UART_ID, false);
     irq_set_exclusive_handler(UART_IRQ, on_uart_rx);
+    irq_set_priority(UART_IRQ, 0x80);// UARTは通常優先度、HSTXは最優先に設定する
     irq_set_enabled(UART_IRQ, true);
     uart_set_irq_enables(UART_ID, true, false);
     gpio_pull_up(UART_TX_PIN);
@@ -215,8 +294,16 @@ void pico_init() {
 
     // init host stack on configured roothub port
     tuh_init(BOARD_TUH_RHPORT);
-    tuh_task();//消すと起動時にキーボード接続していた時に、認識しない時がある？
+//    tuh_task();//消すと起動時にキーボード接続していた時に、認識しない時がある？
+
     add_repeating_timer_us(-16666, timer, NULL, &out);//60FPS
+
+#ifdef PICO_RP2350
+    hstx_video_fill(0x00);
+    hstx_video_init();
+    video_on();
+#endif
+
 }
 
 #ifndef PICO_RP2350
