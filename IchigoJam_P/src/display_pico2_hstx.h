@@ -9,6 +9,7 @@
 #include "hardware/structs/bus_ctrl.h"
 #include "hardware/structs/hstx_ctrl.h"
 #include "hardware/structs/hstx_fifo.h"
+#include "pico/multicore.h"
 
 // -----------------------------------------------------------------------------
 // 640x480@60Hz DVI timing
@@ -116,7 +117,7 @@ static volatile uint hstx_v_scanline = 2;
 static volatile bool hstx_vactive_cmdlist_posted = false;
 static volatile uint32_t hstx_frame_count = 0;
 static volatile uint32_t hstx_irq_count = 0;
-static bool hstx_started = false;
+static volatile bool hstx_started = false;
 
 // -----------------------------------------------------------------------------
 // RGB332 helper
@@ -366,6 +367,17 @@ void hstx_video_test_pattern(void) {
                 y * HSTX_MODE_H_ACTIVE_PIXELS + x
             ] = colour;
         }
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Core 1: HSTX DMA / DMA IRQ専用
+
+void hstx_core1_main(void) {
+    hstx_video_init();
+
+    while (true) {
+        __wfi();
     }
 }
 

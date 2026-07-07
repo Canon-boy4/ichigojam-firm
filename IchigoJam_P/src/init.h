@@ -293,16 +293,31 @@ void pico_init() {
     gpio_put(PICO_LED_PIN, 1);
 
     // init host stack on configured roothub port
-    tuh_init(BOARD_TUH_RHPORT);
-//    tuh_task();//消すと起動時にキーボード接続していた時に、認識しない時がある？
+    // tuh_init(BOARD_TUH_RHPORT); 下に同じものがあるため削除した。
+    // tuh_task();//消すと起動時にキーボード接続していた時に、認識しない時がある？
 
-    add_repeating_timer_us(-16666, timer, NULL, &out);//60FPS
+    // add_repeating_timer_us(-16666, timer, NULL, &out);//60FPS
 
 #ifdef PICO_RP2350
+    // HSTXフレームバッファを黒で初期化
     hstx_video_fill(0x00);
-    hstx_video_init();
+
+    // core 0ではDMA_IRQ_1を絶対に有効化しない。
+    // HSTX DMA IRQはcore 1だけで受ける。
+    irq_set_enabled(DMA_IRQ_1, false);
+
+    // core 1でHSTX DMA初期化とDMA IRQ処理を開始
+    multicore_launch_core1(hstx_core1_main);
+
+    // 画面サイズだけ先に設定する。HSTX開始待ちはしない。
     video_on();
 #endif
+
+    // init host stack on configured roothub port USB Hostは一度だけ初期化
+    tuh_init(BOARD_TUH_RHPORT);
+
+    // 60 FPSタイマも一度だけ登録
+    add_repeating_timer_us(-16666, timer, NULL, &out);
 
 }
 
