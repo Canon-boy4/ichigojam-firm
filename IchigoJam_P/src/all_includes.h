@@ -64,6 +64,11 @@
 #include "storage.h"
 #include "keyboard.h"
 #include "hid_app.c"
+
+#ifdef PICO_RP2350
+#include "display_pico2_hstx.h"
+#endif
+
 #include "display.h"
 #include "io.h"
 #include "system.h"
