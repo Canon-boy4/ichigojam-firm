@@ -292,11 +292,7 @@ void pico_init() {
     gpio_set_dir(PICO_LED_PIN, GPIO_OUT);
     gpio_put(PICO_LED_PIN, 1);
 
-    // init host stack on configured roothub port
-    // tuh_init(BOARD_TUH_RHPORT); 下に同じものがあるため削除した。
     // tuh_task();//消すと起動時にキーボード接続していた時に、認識しない時がある？
-
-    // add_repeating_timer_us(-16666, timer, NULL, &out);//60FPS
 
 #ifdef PICO_RP2350
     // HSTXフレームバッファを黒で初期化
