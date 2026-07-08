@@ -10,6 +10,7 @@
 #include "hardware/structs/hstx_ctrl.h"
 #include "hardware/structs/hstx_fifo.h"
 #include "pico/multicore.h"
+#include "pico/flash.h"
 
 // -----------------------------------------------------------------------------
 // 640x480@60Hz DVI timing
@@ -374,6 +375,8 @@ void hstx_video_test_pattern(void) {
 // Core 1: HSTX DMA / DMA IRQ専用
 
 void hstx_core1_main(void) {
+    flash_safe_execute_core_init();
+
     hstx_video_init();
 
     while (true) {

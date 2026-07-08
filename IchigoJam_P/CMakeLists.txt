@@ -25,6 +25,7 @@ target_compile_definitions(IchigoJam_P PRIVATE
 target_link_libraries(IchigoJam_P PUBLIC
     pico_stdlib
     pico_multicore
+    pico_flash
     pico_util
     pico_sync
     tinyusb_host
