@@ -10,6 +10,10 @@
 
 #include "all_includes.h"
 
+#ifdef PICO_RP2350
+#include "pico/flash.h"
+#endif
+
 /*
  * ===== MODIFIED =====
  * Internal Flash program storage
@@ -74,6 +78,35 @@ uint8_t* get_flash(uint32_t offset) {
     return (uint8_t*)(XIP_BASE + offset);
 }
 
+#ifdef PICO_RP2350
+
+typedef struct {
+    uint32_t offset;
+    const uint8_t *data;
+} ijb_flash_write_param_t;
+
+static void __not_in_flash_func(ijb_flash_write_callback)(void *param) {
+    ijb_flash_write_param_t *p = (ijb_flash_write_param_t *)param;
+
+    flash_range_erase(p->offset, FLASH_SECTOR_SIZE);
+    flash_range_program(p->offset, p->data, FLASH_SECTOR_SIZE);
+}
+
+static int ijb_flash_write_safe(uint32_t offset, const uint8_t *data) {
+    ijb_flash_write_param_t param = {
+        .offset = offset,
+        .data = data,
+    };
+
+    return flash_safe_execute(
+        ijb_flash_write_callback,
+        &param,
+        1000
+    );
+}
+
+#endif
+
 // err:1 no_err:0
 static int IJB_save(int n, uint8* list, int size) {
     _g.lastfile = n;
@@ -81,16 +114,24 @@ static int IJB_save(int n, uint8* list, int size) {
 
     if (0 <= n && n < N_FLASH_STORAGE) {
         uint32_t offset = calc_flash_offset(n);
-
+ 
         // フラッシュメモリに書き込む時は排他制御する
+#ifdef PICO_RP2350
+        int flash_result = ijb_flash_write_safe(offset, list);
+        res = (flash_result == PICO_OK) ? 0 : 1;
+#else
         video_off(0);
+
         int save = save_and_disable_interrupts();
+
         flash_range_erase(offset, FLASH_SECTOR_SIZE);
         flash_range_program(offset, list, FLASH_SECTOR_SIZE);
+
         video_on();
         restore_interrupts(save);
 
         res = 0;
+#endif
 
     } else if (EEPROM_OFFSET <= n && n < EEPROM_OFFSET + EEPROM_SIZE) {
         /*
