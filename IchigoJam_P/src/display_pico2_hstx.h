@@ -6,6 +6,7 @@
 #include "hardware/dma.h"
 #include "hardware/gpio.h"
 #include "hardware/irq.h"
+#include "hardware/resets.h"
 #include "hardware/structs/bus_ctrl.h"
 #include "hardware/structs/hstx_ctrl.h"
 #include "hardware/structs/hstx_fifo.h"
@@ -119,6 +120,7 @@ static volatile bool hstx_vactive_cmdlist_posted = false;
 static volatile uint32_t hstx_frame_count = 0;
 static volatile uint32_t hstx_irq_count = 0;
 static volatile bool hstx_started = false;
+static volatile bool hstx_core1_ready = false;
 
 // -----------------------------------------------------------------------------
 // RGB332 helper
@@ -351,6 +353,8 @@ void hstx_video_fill(uint8_t colour) {
     );
 }
 
+void hstx_core1_main(void);
+
 void hstx_video_test_pattern(void) {
     for (uint y = 0; y < HSTX_MODE_V_ACTIVE_LINES; ++y) {
         for (uint x = 0; x < HSTX_MODE_H_ACTIVE_PIXELS; ++x) {
@@ -371,6 +375,66 @@ void hstx_video_test_pattern(void) {
     }
 }
 
+int hstx_core1_reboot(void) {
+    // core 1を止める。HSTX DMA IRQもcore 1側で動いているため、
+    // ここでcore 1側のIRQ処理を完全に止める。
+    multicore_reset_core1();
+
+    // HSTX出力停止
+    hstx_ctrl_hw->csr = 0;
+
+    // HSTX用DMAを停止
+    dma_channel_abort(HSTX_DMACH_PING);
+    dma_channel_abort(HSTX_DMACH_PONG);
+
+    // DMA IRQ通知を止め、保留フラグを消す
+    dma_channel_set_irq1_enabled(HSTX_DMACH_PING, false);
+    dma_channel_set_irq1_enabled(HSTX_DMACH_PONG, false);
+    dma_channel_acknowledge_irq1(HSTX_DMACH_PING);
+    dma_channel_acknowledge_irq1(HSTX_DMACH_PONG);
+    irq_clear(DMA_IRQ_1);
+
+    // DMAとHSTXハードウェアブロックを初期状態へ戻す。
+    // SAVE後にDMA完了IRQが再開しないため、DMAチャネル0/1だけでなく
+    // DMAブロック全体をリセットする。
+    reset_block(RESETS_RESET_DMA_BITS | RESETS_RESET_HSTX_BITS);
+    unreset_block_wait(RESETS_RESET_DMA_BITS | RESETS_RESET_HSTX_BITS);
+
+    // HSTX状態変数を初期化
+    hstx_dma_pong = false;
+    hstx_v_scanline = 2;
+    hstx_vactive_cmdlist_posted = false;
+    hstx_started = false;
+
+    // core 1を再起動し、初回起動と同じ経路でHSTXを開始する
+    hstx_core1_ready = false;
+    hstx_frame_count = 0;
+
+    multicore_launch_core1(hstx_core1_main);
+
+    // core 1が hstx_core1_main() に入り、HSTX初期化を終えるまで待つ
+    for (uint32_t i = 0; i < 1000000; i++) {
+        if (hstx_core1_ready) {
+            break;
+        }
+        tight_loop_contents();
+    }
+
+    if (!hstx_core1_ready) {
+        return 1;   // core 1再起動失敗
+    }
+
+    // HSTX DMA IRQが再開し、フレームが進むか確認する
+    for (uint32_t i = 0; i < 3000000; i++) {
+        if (hstx_frame_count >= 2) {
+            return 0;   // core 1再起動 + HSTX走査再開 OK
+        }
+        tight_loop_contents();
+    }
+
+    return 2;   // core 1は起動したが、HSTXフレームが進まない
+}
+
 // -----------------------------------------------------------------------------
 // Core 1: HSTX DMA / DMA IRQ専用
 
@@ -378,6 +442,7 @@ void hstx_core1_main(void) {
     flash_safe_execute_core_init();
 
     hstx_video_init();
+    hstx_core1_ready = true;
 
     while (true) {
         __wfi();

@@ -12,6 +12,7 @@
 
 #ifdef PICO_RP2350
 #include "pico/flash.h"
+int hstx_core1_reboot(void);
 #endif
 
 /*
@@ -118,6 +119,11 @@ static int IJB_save(int n, uint8* list, int size) {
         // フラッシュメモリに書き込む時は排他制御する
 #ifdef PICO_RP2350
         int flash_result = ijb_flash_write_safe(offset, list);
+
+        // flash_safe_execute() 中にcore 1が止まりDVI同期を失うため、
+        // SAVE完了後にcore 1ごとHSTXを初回起動相当に戻す。
+        hstx_core1_reboot();
+
         res = (flash_result == PICO_OK) ? 0 : 1;
 #else
         video_off(0);
