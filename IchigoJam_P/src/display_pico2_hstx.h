@@ -375,6 +375,14 @@ void hstx_video_test_pattern(void) {
     }
 }
 
+// SAVE時に flash_safe_execute() により core 1 が一時停止すると、
+// HSTX DMA IRQ が止まり、DVI同期が失われる。
+// SAVE完了後、core 1 と HSTX/DMA を初回起動相当の状態へ戻す。
+//
+// 戻り値:
+//   0: core 1再起動、HSTX初期化、フレーム進行まで成功
+//   1: core 1再起動または hstx_core1_main() 到達に失敗
+//   2: core 1は起動したが、HSTX DMA IRQが進まず frame_count が増えない
 int hstx_core1_reboot(void) {
     // core 1を止める。HSTX DMA IRQもcore 1側で動いているため、
     // ここでcore 1側のIRQ処理を完全に止める。

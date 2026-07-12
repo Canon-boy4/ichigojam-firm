@@ -24,12 +24,19 @@ int hstx_core1_reboot(void);
  *
  * 4KB版では 1スロット = 1セクタ = 4096バイト。
  */
+#ifdef PICO_RP2350
+// Pico 2 has 4MB flash. Use the upper end of flash for internal BASIC slots.
+#define FLASH_IJ_OFFSET (PICO_FLASH_SIZE_BYTES - FLASH_SECTOR_SIZE * 2)
+#else
+// Pico / RP2040 remains compatible with the original 2MB flash layout.
 #define FLASH_IJ_OFFSET (0x200000 - FLASH_SECTOR_SIZE * 2)
+#endif
 
 /*
  * External EEPROM file numbers
  *
- * Internal Flash : 0 .. 24
+ * Internal Flash RP2040: 0 .. 24
+ *                RP2350: 0 .. 99
  * External I2C   : 100 ..
  */
 #define EEPROM_OFFSET 100
@@ -122,7 +129,8 @@ static int IJB_save(int n, uint8* list, int size) {
 
         // flash_safe_execute() 中にcore 1が止まりDVI同期を失うため、
         // SAVE完了後にcore 1ごとHSTXを初回起動相当に戻す。
-        hstx_core1_reboot();
+        // 戻り値は診断用。通常動作ではSAVE結果を優先する。
+        (void)hstx_core1_reboot();
 
         res = (flash_result == PICO_OK) ? 0 : 1;
 #else
