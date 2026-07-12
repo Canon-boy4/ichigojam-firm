@@ -3642,6 +3642,102 @@ static int ir_measure_pulse_us(int gpio, int level, uint32_t timeout_us) {
     return (int)(time_us_32() - st);
 }
 
+#ifdef PICO_RP2350
+static volatile int ir_dbg_leader_high_rp2350 = -1;
+
+static int ir_wait_low_rp2350(int gpio, uint32_t timeout_us) {
+    // Interrupts are enabled while waiting for the first LOW.
+    // This avoids stopping USB/HSTX for a long no-signal wait.
+    uint32_t start = time_us_32();
+
+    while (gpio_get(gpio) != 0) {
+        if ((uint32_t)(time_us_32() - start) > timeout_us) {
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
+static int ir_acquire_nec_leader_rp2350(
+    int gpio,
+    int* out_low,
+    int* out_high,
+    uint8_t* rpt
+) {
+    // Caller must already have disabled interrupts.
+    //
+    // This function assumes the input is already LOW.
+    // It measures the remaining LOW width and the following HIGH width
+    // continuously.
+    //
+    // Accept LOW from 7ms to catch a leader LOW that was entered late.
+
+    const uint32_t low_timeout_us = 15000;
+    const uint32_t high_timeout_us = 8000;
+
+    const int leader_low_min = 1000;
+    const int leader_low_max = 11500;
+
+    *out_low = -1;
+    *out_high = -1;
+    *rpt = 0;
+    ir_dbg_leader_high_rp2350 = -1;
+
+    // Must still be LOW when we start measuring.
+    if (gpio_get(gpio) != 0) {
+        return 2;
+    }
+
+    // Measure LOW from the current point.
+    uint32_t low_start = time_us_32();
+
+    while (gpio_get(gpio) == 0) {
+        if ((uint32_t)(time_us_32() - low_start) > low_timeout_us) {
+            *out_low = -1;
+            *out_high = -1;
+            ir_dbg_leader_high_rp2350 = -1;
+            return 2;
+        }
+    }
+
+    int t_low = (int)(time_us_32() - low_start);
+    *out_low = t_low;
+
+    // Now L=7000..11500 is accepted as a leader candidate.
+    if (t_low < leader_low_min || t_low > leader_low_max) {
+        return 2;
+    }
+
+    // Immediately measure the HIGH following this LOW.
+    uint32_t high_start = time_us_32();
+
+    while (gpio_get(gpio) != 0) {
+        if ((uint32_t)(time_us_32() - high_start) > high_timeout_us) {
+            break;
+        }
+    }
+
+    int t_high = (int)(time_us_32() - high_start);
+    *out_high = t_high;
+    ir_dbg_leader_high_rp2350 = t_high;
+
+    // Repeat frame: about 2.25ms HIGH.
+    if (t_high > 1800 && t_high < 3000) {
+        *rpt = 1;
+        return 0;
+    }
+
+    // Normal frame: about 4.5ms HIGH.
+    if (t_high >= 3500 && t_high <= 5500) {
+        *rpt = 0;
+        return 0;
+    }
+
+    return 3;
+}
+#endif
+
 // ===== MODIFIED (Givetake BASIC) =====
 // Decode NEC / NEC-extended frame AFTER leader-low has already been detected.
 //
@@ -3676,6 +3772,10 @@ static int ir_decode_nec_after_leader_low(int gpio, uint8_t* b0, uint8_t* b1, ui
     // ------------------------------------------------------------
     t_high = ir_measure_pulse_us(gpio, 1, 7000);
 
+#ifdef PICO_RP2350
+    ir_dbg_leader_high_rp2350 = t_high;
+#endif
+
     // NEC repeat frame
     if (t_high > 1800 && t_high < 3000) {
         *rpt = 1;
@@ -3700,7 +3800,6 @@ static int ir_decode_nec_after_leader_low(int gpio, uint8_t* b0, uint8_t* b1, ui
         if (t_low < 250 || t_low > 1000) {
             return 4;
         }
-
         // high part:
         //   0 -> about 560us
         //   1 -> about 1690us
@@ -3767,6 +3866,63 @@ static int ir_decode_nec_after_leader_low(int gpio, uint8_t* b0, uint8_t* b1, ui
     return 0;
 }
 
+#ifdef PICO_RP2350
+static int ir_decode_nec_data_bits_rp2350(
+    int gpio,
+    uint8_t* b0,
+    uint8_t* b1,
+    uint8_t* b2,
+    uint8_t* b3,
+    uint8_t* mode
+) {
+    int t_low, t_high;
+    uint32_t data = 0;
+
+    for (int i = 0; i < 32; i++) {
+        t_low = ir_measure_pulse_us(gpio, 0, 2000);
+        if (t_low < 250 || t_low > 1000) {
+            return 4;
+        }
+
+        t_high = ir_measure_pulse_us(gpio, 1, 3000);
+        if (t_high < 200) {
+            return 5;
+        }
+
+        if (t_high > 1100) {
+            data |= (1u << i);
+        }
+    }
+
+    {
+        uint8_t rx0 =  data        & 0xff;
+        uint8_t rx1 = (data >> 8)  & 0xff;
+        uint8_t rx2 = (data >> 16) & 0xff;
+        uint8_t rx3 = (data >> 24) & 0xff;
+
+        if ((uint8_t)(rx2 ^ rx3) != 0xff) {
+            return 6;
+        }
+
+        if ((uint8_t)(rx0 ^ rx1) == 0xff) {
+            *b0 = rx0;
+            *b1 = rx1;
+            *b2 = rx2;
+            *b3 = rx3;
+            *mode = 0;
+        } else {
+            *b0 = rx1;
+            *b1 = rx0;
+            *b2 = rx2;
+            *b3 = rx3;
+            *mode = 1;
+        }
+    }
+
+    return 0;
+}
+#endif
+
 // ===== MODIFIED (Givetake BASIC) =====
 // Wait for NEC leader-low (~9ms) in normal system state.
 // Only after leader-low is detected, disable interrupts
@@ -3815,11 +3971,21 @@ S_INLINE void command_ir_in() {
     token_end();
     IJB_ERR_CHK();
 
+#ifdef PICO_RP2350
+    // We use [base] .. [base+8] on RP2350.
+    // [base+7] = measured leader LOW width for debug.
+    // [base+8] = measured leader HIGH width for debug.
+    if (base < 0 || base + 8 >= IJB_SIZEOF_ARRAY_MAX) {
+        command_error(ERR_INDEX_OUT_OF_RANGE);
+        return;
+    }
+#else
     // We use [base] .. [base+6]
     if (base < 0 || base + 6 >= IJB_SIZEOF_ARRAY_MAX) {
         command_error(ERR_INDEX_OUT_OF_RANGE);
         return;
     }
+#endif
 
     int gpio = ir_port_to_gpio(port);
     if (gpio < 0) {
@@ -3858,7 +4024,80 @@ S_INLINE void command_ir_in() {
     // press could otherwise stop the whole machine too long.
     // ------------------------------------------------------------
     {
+#ifdef PICO_RP2350
+        int t_low = -1;
+        int t_high = -1;
+
+        const uint32_t total_wait_us = 1000000;
+        uint32_t wait_start = time_us_32();
+
+        ir_dbg_leader_high_rp2350 = -1;
+
+        // Clear debug values for every IR.IN call.
+        *basic_getArrayPtr(base + 7) = -1;
+        *basic_getArrayPtr(base + 8) = -1;
+
+        err = 2;
+
+        while ((uint32_t)(time_us_32() - wait_start) <= total_wait_us) {
+            uint32_t elapsed = (uint32_t)(time_us_32() - wait_start);
+            uint32_t remain = total_wait_us - elapsed;
+
+            // Wait for a LOW pulse with interrupts enabled.
+            // This avoids stopping USB/HSTX while there is no IR signal.
+            if (ir_wait_low_rp2350(gpio, remain) < 0) {
+                t_low = -1;
+                t_high = -1;
+                ir_dbg_leader_high_rp2350 = -1;
+                err = 2;
+                break;
+            }
+
+            // We are now inside a LOW pulse.
+            // From here through L/H measurement and 32-bit decode,
+            // keep interrupts disabled continuously.
+            int save = save_and_disable_interrupts();
+
+            t_low = -1;
+            t_high = -1;
+            rpt = 0;
+            ir_dbg_leader_high_rp2350 = -1;
+
+            err = ir_acquire_nec_leader_rp2350(gpio, &t_low, &t_high, &rpt);
+
+            // Short LOW pulse. Not a leader candidate.
+            // Ignore it and continue waiting inside this IR.IN call.
+            if (err == 2 && t_low >= 0 && t_low < 1000) {
+                restore_interrupts(save);
+                continue;
+            }
+
+            if (err == 0) {
+                if (rpt) {
+                    // NEC repeat frame has no new 32-bit code.
+                    // Keep it as E=7. Do not reuse the previous key code.
+                    err = 7;
+                } else {
+                    // Leader LOW and HIGH were already consumed.
+                    // Decode the 32 data bits immediately, without
+                    // re-enabling interrupts between H and DATA.
+                    err = ir_decode_nec_data_bits_rp2350(gpio, &b0, &b1, &b2, &b3, &mode);
+                }
+            }
+
+            restore_interrupts(save);
+
+            // We have a real result for this candidate:
+            // E=0 normal, E=7 repeat, or E=3/4/5/6 decode/candidate error.
+            break;
+        }
+
+        // Debug: measured leader LOW/HIGH width for the final candidate.
+        *basic_getArrayPtr(base + 7) = t_low;
+        ir_dbg_leader_high_rp2350 = t_high;
+#else
         int t_low = ir_measure_pulse_us(gpio, 0, 15000);
+
         if (t_low < 8000 || t_low > 10000) {
             err = 2;
         } else {
@@ -3873,6 +4112,7 @@ S_INLINE void command_ir_in() {
 
             restore_interrupts(save);
         }
+#endif
     }
 
     // ------------------------------------------------------------
@@ -3885,6 +4125,10 @@ S_INLINE void command_ir_in() {
     *basic_getArrayPtr(base + 4) = rpt;
     *basic_getArrayPtr(base + 5) = err;
     *basic_getArrayPtr(base + 6) = mode;
+
+#ifdef PICO_RP2350
+    *basic_getArrayPtr(base + 8) = ir_dbg_leader_high_rp2350;
+#endif
 }
 
 // ===== MODIFIED (Givetake BASIC) =====
