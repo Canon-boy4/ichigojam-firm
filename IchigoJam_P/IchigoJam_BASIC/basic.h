@@ -4,6 +4,10 @@
 #define __BASIC_H__
 
 #include "lang.h"
+#ifdef PICO_RP2350
+#include "hardware/pio.h"
+#include "hardware/clocks.h"
+#endif
 
 #ifdef IJB_USE_EXCEPTION
 #define IJB_ERR_CHK()
@@ -3645,6 +3649,190 @@ static int ir_measure_pulse_us(int gpio, int level, uint32_t timeout_us) {
 #ifdef PICO_RP2350
 static volatile int ir_dbg_leader_high_rp2350 = -1;
 
+// PIO sampling debug for RP2350 IN4/GPIO7.
+// This is only for checking whether PIO can capture NEC IR waveform
+// while HSTX/DVI is running.
+#define IR_PIO_GPIO_RP2350 7
+#define IR_PIO_SAMPLE_US_RP2350 50
+#define IR_PIO_WORD_BUF_SIZE_RP2350 128
+
+static PIO ir_pio_rp2350 = pio0;
+static uint ir_pio_sm_rp2350 = 0;
+static uint ir_pio_offset_rp2350 = 0;
+static uint8_t ir_pio_ready_rp2350 = 0;
+
+static const uint16_t ir_pio_sample_program_instructions_rp2350[] = {
+    // in pins, 1
+    // PIO instruction encoding:
+    //   IN opcode = 0x4000
+    //   source pins = 0
+    //   bit count = 1
+    0x4001,
+};
+
+static const struct pio_program ir_pio_sample_program_rp2350 = {
+    .instructions = ir_pio_sample_program_instructions_rp2350,
+    .length = 1,
+    .origin = -1,
+};
+
+static void ir_pio_capture_init_rp2350(void) {
+    if (ir_pio_ready_rp2350) {
+        return;
+    }
+
+    gpio_init(IR_PIO_GPIO_RP2350);
+    gpio_set_dir(IR_PIO_GPIO_RP2350, GPIO_IN);
+    gpio_pull_up(IR_PIO_GPIO_RP2350);
+
+    pio_gpio_init(ir_pio_rp2350, IR_PIO_GPIO_RP2350);
+
+    ir_pio_offset_rp2350 = pio_add_program(
+        ir_pio_rp2350,
+        &ir_pio_sample_program_rp2350
+    );
+
+    pio_sm_config c = pio_get_default_sm_config();
+
+    sm_config_set_in_pins(&c, IR_PIO_GPIO_RP2350);
+
+    // This program has only one instruction.
+    // Force the state machine to loop on that one instruction.
+    sm_config_set_wrap(
+        &c,
+        ir_pio_offset_rp2350,
+        ir_pio_offset_rp2350
+    );
+
+    // Use the whole FIFO as RX FIFO.
+    sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_RX);
+
+    // Shift left, autopush every 32 samples.
+    // In the export code below, bit31 is treated as the oldest sample.
+    sm_config_set_in_shift(&c, false, true, 32);
+		
+    // One PIO instruction per sample.
+    // Sample period = 50us, sample rate = 20000Hz.
+    float div = (float)clock_get_hz(clk_sys) /
+                (1000000.0f / (float)IR_PIO_SAMPLE_US_RP2350);
+
+    sm_config_set_clkdiv(&c, div);
+
+    pio_sm_init(
+        ir_pio_rp2350,
+        ir_pio_sm_rp2350,
+        ir_pio_offset_rp2350,
+        &c
+    );
+
+    pio_sm_set_enabled(ir_pio_rp2350, ir_pio_sm_rp2350, false);
+
+    ir_pio_ready_rp2350 = 1;
+}
+
+static void ir_pio_capture_stop_clear_rp2350(void) {
+    pio_sm_set_enabled(ir_pio_rp2350, ir_pio_sm_rp2350, false);
+    pio_sm_clear_fifos(ir_pio_rp2350, ir_pio_sm_rp2350);
+    pio_sm_restart(ir_pio_rp2350, ir_pio_sm_rp2350);
+}
+
+static int ir_pio_capture_words_rp2350(uint32_t* words, int max_words, uint32_t capture_us) {
+    int n = 0;
+
+    ir_pio_capture_stop_clear_rp2350();
+
+    pio_sm_set_enabled(ir_pio_rp2350, ir_pio_sm_rp2350, true);
+
+    uint32_t start = time_us_32();
+
+    while ((uint32_t)(time_us_32() - start) < capture_us) {
+        while (!pio_sm_is_rx_fifo_empty(ir_pio_rp2350, ir_pio_sm_rp2350)) {
+            uint32_t w = pio_sm_get(ir_pio_rp2350, ir_pio_sm_rp2350);
+
+            if (n < max_words) {
+                words[n++] = w;
+            }
+        }
+    }
+
+    while (!pio_sm_is_rx_fifo_empty(ir_pio_rp2350, ir_pio_sm_rp2350)) {
+        uint32_t w = pio_sm_get(ir_pio_rp2350, ir_pio_sm_rp2350);
+
+        if (n < max_words) {
+            words[n++] = w;
+        }
+    }
+
+    pio_sm_set_enabled(ir_pio_rp2350, ir_pio_sm_rp2350, false);
+
+    return n;
+}
+
+static int ir_pio_get_sample_rp2350(uint32_t* words, int sample_index) {
+    int word_index = sample_index >> 5;
+    int bit_index = 31 - (sample_index & 31);
+
+    return (words[word_index] >> bit_index) & 1;
+}
+
+static void ir_pio_debug_export_rp2350(int base) {
+    uint32_t words[IR_PIO_WORD_BUF_SIZE_RP2350];
+
+    for (int i = 50; i < 90; i++) {
+        *basic_getArrayPtr(base + i) = 0;
+    }
+
+    ir_pio_capture_init_rp2350();
+
+    // Capture 120ms.
+    // NEC normal frame is about 67ms, so 120ms is enough for one press.
+    int nwords = ir_pio_capture_words_rp2350(
+        words,
+        IR_PIO_WORD_BUF_SIZE_RP2350,
+        120000
+    );
+
+    *basic_getArrayPtr(base + 9) = nwords;
+
+    if (nwords <= 0) {
+        return;
+    }
+
+    int total_samples = nwords * 32;
+
+    // Find the first LOW sample.
+    // IR receiver output is normally HIGH, active LOW.
+    int pos = 0;
+    while (pos < total_samples && ir_pio_get_sample_rp2350(words, pos) != 0) {
+        pos++;
+    }
+
+    if (pos >= total_samples) {
+        return;
+    }
+
+    int out = 50;
+
+    while (pos < total_samples && out < 90) {
+        int level = ir_pio_get_sample_rp2350(words, pos);
+        int start = pos;
+
+        while (pos < total_samples && ir_pio_get_sample_rp2350(words, pos) == level) {
+            pos++;
+        }
+
+        int width_us = (pos - start) * IR_PIO_SAMPLE_US_RP2350;
+
+        if (level == 0) {
+            *basic_getArrayPtr(base + out) = width_us;
+        } else {
+            *basic_getArrayPtr(base + out) = -width_us;
+        }
+
+        out++;
+    }
+}
+
 static int ir_wait_low_rp2350(int gpio, uint32_t timeout_us) {
     // Interrupts are enabled while waiting for the first LOW.
     // This avoids stopping USB/HSTX for a long no-signal wait.
@@ -3972,10 +4160,13 @@ S_INLINE void command_ir_in() {
     IJB_ERR_CHK();
 
 #ifdef PICO_RP2350
-    // We use [base] .. [base+8] on RP2350.
-    // [base+7] = measured leader LOW width for debug.
-    // [base+8] = measured leader HIGH width for debug.
-    if (base < 0 || base + 8 >= IJB_SIZEOF_ARRAY_MAX) {
+    // We use [base] .. [base+89] on RP2350 for PIO sampling debug.
+    // [base+7]  = polling measured leader LOW width.
+    // [base+8]  = polling measured leader HIGH width.
+    // [base+9]  = number of PIO words captured.
+    // [base+50]..[base+89] = PIO pulse widths.
+    // Positive value = LOW width, negative value = HIGH width.
+    if (base < 0 || base + 89 >= IJB_SIZEOF_ARRAY_MAX) {
         command_error(ERR_INDEX_OUT_OF_RANGE);
         return;
     }
@@ -4025,76 +4216,34 @@ S_INLINE void command_ir_in() {
     // ------------------------------------------------------------
     {
 #ifdef PICO_RP2350
-        int t_low = -1;
-        int t_high = -1;
-
-        const uint32_t total_wait_us = 1000000;
-        uint32_t wait_start = time_us_32();
-
+        // PIO sampling accuracy test mode.
+        // Do not run the polling NEC decoder here.
+        // E=2 is expected in this debug mode.
         ir_dbg_leader_high_rp2350 = -1;
 
-        // Clear debug values for every IR.IN call.
         *basic_getArrayPtr(base + 7) = -1;
         *basic_getArrayPtr(base + 8) = -1;
+        *basic_getArrayPtr(base + 9) = 0;
 
-        err = 2;
-
-        while ((uint32_t)(time_us_32() - wait_start) <= total_wait_us) {
-            uint32_t elapsed = (uint32_t)(time_us_32() - wait_start);
-            uint32_t remain = total_wait_us - elapsed;
-
-            // Wait for a LOW pulse with interrupts enabled.
-            // This avoids stopping USB/HSTX while there is no IR signal.
-            if (ir_wait_low_rp2350(gpio, remain) < 0) {
-                t_low = -1;
-                t_high = -1;
-                ir_dbg_leader_high_rp2350 = -1;
-                err = 2;
-                break;
-            }
-
-            // We are now inside a LOW pulse.
-            // From here through L/H measurement and 32-bit decode,
-            // keep interrupts disabled continuously.
-            int save = save_and_disable_interrupts();
-
-            t_low = -1;
-            t_high = -1;
-            rpt = 0;
-            ir_dbg_leader_high_rp2350 = -1;
-
-            err = ir_acquire_nec_leader_rp2350(gpio, &t_low, &t_high, &rpt);
-
-            // Short LOW pulse. Not a leader candidate.
-            // Ignore it and continue waiting inside this IR.IN call.
-            if (err == 2 && t_low >= 0 && t_low < 1000) {
-                restore_interrupts(save);
-                continue;
-            }
-
-            if (err == 0) {
-                if (rpt) {
-                    // NEC repeat frame has no new 32-bit code.
-                    // Keep it as E=7. Do not reuse the previous key code.
-                    err = 7;
-                } else {
-                    // Leader LOW and HIGH were already consumed.
-                    // Decode the 32 data bits immediately, without
-                    // re-enabling interrupts between H and DATA.
-                    err = ir_decode_nec_data_bits_rp2350(gpio, &b0, &b1, &b2, &b3, &mode);
-                }
-            }
-
-            restore_interrupts(save);
-
-            // We have a real result for this candidate:
-            // E=0 normal, E=7 repeat, or E=3/4/5/6 decode/candidate error.
-            break;
+        for (int i = 50; i < 90; i++) {
+            *basic_getArrayPtr(base + i) = 0;
         }
 
-        // Debug: measured leader LOW/HIGH width for the final candidate.
-        *basic_getArrayPtr(base + 7) = t_low;
-        ir_dbg_leader_high_rp2350 = t_high;
+        // Wait up to 1 second for IR receiver output to go LOW.
+        // This lets the user press the remote after "PUSH" is printed.
+        {
+            uint32_t wait_start = time_us_32();
+
+            while ((uint32_t)(time_us_32() - wait_start) <= 1000000) {
+                if (gpio_get(gpio) == 0) {
+                    break;
+                }
+            }
+        }
+
+        ir_pio_debug_export_rp2350(base);
+
+        err = 2;
 #else
         int t_low = ir_measure_pulse_us(gpio, 0, 15000);
 

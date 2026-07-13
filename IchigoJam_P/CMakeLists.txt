@@ -35,6 +35,8 @@ target_link_libraries(IchigoJam_P PUBLIC
     hardware_watchdog
     hardware_adc
     hardware_pwm
+    hardware_pio
+    hardware_clocks
     hardware_i2c
 )
 
