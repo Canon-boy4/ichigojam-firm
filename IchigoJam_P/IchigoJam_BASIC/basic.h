@@ -4317,7 +4317,6 @@ static int ir_measure_pulse_us(int gpio, int level, uint32_t timeout_us)
 }
 
 #ifdef PICO_RP2350
-static volatile int ir_dbg_leader_high_rp2350 = -1;
 
 // PIO sampling debug for RP2350 IN4/GPIO7.
 // This is only for checking whether PIO can capture NEC IR waveform
@@ -4332,6 +4331,7 @@ static uint ir_pio_sm_rp2350 = 0;
 static uint ir_pio_offset_rp2350 = 0;
 static int ir_pio_dma_chan_rp2350 = -1;
 static uint8_t ir_pio_ready_rp2350 = 0;
+static int ir_dbg_leader_high_rp2350 = -1;
 
 static const uint16_t ir_pio_sample_program_instructions_rp2350[] = {
 		// in pins, 1
@@ -4526,58 +4526,6 @@ static int ir_pio_measure_level_rp2350(
 	return (*pos - start) * IR_PIO_SAMPLE_US_RP2350;
 }
 
-static int ir_pio_clip_basic_value_rp2350(int v)
-{
-	if (v > 32767)
-	{
-		return 32767;
-	}
-
-	if (v < -32768)
-	{
-		return -32768;
-	}
-
-	return v;
-}
-
-static void ir_pio_export_pulses_rp2350(
-		int base,
-		uint32_t *words,
-		int total_samples,
-		int start_pos)
-{
-	for (int i = 50; i < 90; i++)
-	{
-		*basic_getArrayPtr(base + i) = 0;
-	}
-
-	int pos = start_pos;
-	int out = 50;
-
-	while (pos < total_samples && out < 90)
-	{
-		int level = ir_pio_get_sample_rp2350(words, pos);
-		int start = pos;
-
-		while (pos < total_samples && ir_pio_get_sample_rp2350(words, pos) == level)
-		{
-			pos++;
-		}
-
-		int width_us = (pos - start) * IR_PIO_SAMPLE_US_RP2350;
-
-		if (level != 0)
-		{
-			width_us = -width_us;
-		}
-
-		*basic_getArrayPtr(base + out) = ir_pio_clip_basic_value_rp2350(width_us);
-
-		out++;
-	}
-}
-
 static int ir_pio_try_decode_nec_at_rp2350(
 		uint32_t *words,
 		int total_samples,
@@ -4722,7 +4670,7 @@ static int ir_pio_try_decode_nec_at_rp2350(
 	return 0;
 }
 
-static int ir_pio_capture_decode_export_rp2350(
+static int ir_pio_capture_decode_rp2350(
 		int base,
 		uint8_t *b0,
 		uint8_t *b1,
@@ -4737,15 +4685,6 @@ static int ir_pio_capture_decode_export_rp2350(
 	*mode = 0;
 	ir_dbg_leader_high_rp2350 = -1;
 
-	*basic_getArrayPtr(base + 7) = -1;
-	*basic_getArrayPtr(base + 8) = -1;
-	*basic_getArrayPtr(base + 9) = 0;
-
-	for (int i = 50; i < 90; i++)
-	{
-		*basic_getArrayPtr(base + i) = 0;
-	}
-
 	ir_pio_capture_init_rp2350();
 
 	// Capture 120ms.
@@ -4755,8 +4694,6 @@ static int ir_pio_capture_decode_export_rp2350(
 			words,
 			IR_PIO_WORD_BUF_SIZE_RP2350,
 			250000);
-
-	*basic_getArrayPtr(base + 9) = nwords;
 
 	if (nwords <= 0)
 	{
@@ -4777,9 +4714,6 @@ static int ir_pio_capture_decode_export_rp2350(
 	{
 		return 2;
 	}
-
-	// Always export raw pulses from the first LOW for debug.
-	ir_pio_export_pulses_rp2350(base, words, total_samples, first_low);
 
 	// Search the whole captured buffer for a decodable NEC frame.
 	// This is important because IR.IN may start while a previous NEC frame is
@@ -4824,13 +4758,6 @@ static int ir_pio_capture_decode_export_rp2350(
 					&trpt,
 					&tmode);
 
-			// Store the latest plausible leader-like candidate for debug.
-			if (high_us >= 1800 && high_us <= 5800)
-			{
-				*basic_getArrayPtr(base + 7) = low_us;
-				ir_dbg_leader_high_rp2350 = high_us;
-			}
-
 			if (r == 0 || r == 7)
 			{
 				*b0 = tb0;
@@ -4840,10 +4767,6 @@ static int ir_pio_capture_decode_export_rp2350(
 				*rpt = trpt;
 				*mode = tmode;
 
-				*basic_getArrayPtr(base + 7) = low_us;
-				ir_dbg_leader_high_rp2350 = high_us;
-
-				ir_pio_export_pulses_rp2350(base, words, total_samples, scan);
 				return r;
 			}
 
@@ -5221,26 +5144,12 @@ S_INLINE void command_ir_in()
 	token_end();
 	IJB_ERR_CHK();
 
-#ifdef PICO_RP2350
-	// We use [base] .. [base+89] on RP2350 for PIO sampling debug.
-	// [base+7]  = polling measured leader LOW width.
-	// [base+8]  = polling measured leader HIGH width.
-	// [base+9]  = number of PIO words captured.
-	// [base+50]..[base+89] = PIO pulse widths.
-	// Positive value = LOW width, negative value = HIGH width.
-	if (base < 0 || base + 89 >= IJB_SIZEOF_ARRAY_MAX)
-	{
-		command_error(ERR_INDEX_OUT_OF_RANGE);
-		return;
-	}
-#else
-	// We use [base] .. [base+6]
+	// [base] .. [base+6] を使用
 	if (base < 0 || base + 6 >= IJB_SIZEOF_ARRAY_MAX)
 	{
 		command_error(ERR_INDEX_OUT_OF_RANGE);
 		return;
 	}
-#endif
 
 	int gpio = ir_port_to_gpio(port);
 	if (gpio < 0)
@@ -5285,15 +5194,6 @@ S_INLINE void command_ir_in()
 		// Wait up to 1 second for IR receiver output to go LOW,
 		// then capture and decode using PIO samples.
 		ir_dbg_leader_high_rp2350 = -1;
-
-		*basic_getArrayPtr(base + 7) = -1;
-		*basic_getArrayPtr(base + 8) = -1;
-		*basic_getArrayPtr(base + 9) = 0;
-
-		for (int i = 50; i < 90; i++)
-		{
-			*basic_getArrayPtr(base + i) = 0;
-		}
 
 		{
 			const uint32_t total_wait_us = 1000000;
@@ -5354,7 +5254,7 @@ S_INLINE void command_ir_in()
 				}
 				else
 				{
-					err = ir_pio_capture_decode_export_rp2350(
+					err = ir_pio_capture_decode_rp2350(
 							base,
 							&b0,
 							&b1,
@@ -5399,9 +5299,6 @@ S_INLINE void command_ir_in()
 	*basic_getArrayPtr(base + 5) = err;
 	*basic_getArrayPtr(base + 6) = mode;
 
-#ifdef PICO_RP2350
-	*basic_getArrayPtr(base + 8) = ir_dbg_leader_high_rp2350;
-#endif
 }
 
 // ===== MODIFIED (Givetake BASIC) =====
