@@ -5190,119 +5190,79 @@ S_INLINE void command_ir_in()
 	// ------------------------------------------------------------
 	{
 #ifdef PICO_RP2350
+		// PIO NEC decode mode for RP2350.
+		// Wait up to 1 second for IR receiver output to go LOW,
+		// then capture and decode using PIO samples.
+		ir_dbg_leader_high_rp2350 = -1;
+
 		{
-			uint8_t best_err = 2;
-			uint8_t best_rpt = 0;
-			uint8_t best_mode = 0;
+			const uint32_t total_wait_us = 1000000;
+			const uint32_t idle_high_us = 20000;
 
-			for (int attempt = 0; attempt < 2; attempt++)
+			uint32_t wait_start = time_us_32();
+			uint8_t idle_ok = 0;
+
+			// First, require the IR input to be HIGH and stable for 20ms.
+			// This avoids starting capture from the middle of NEC data bits.
+			while ((uint32_t)(time_us_32() - wait_start) <= total_wait_us)
 			{
-				const uint32_t total_wait_us = 200000;
-				const uint32_t idle_high_us = 20000;
-
-				uint32_t wait_start = time_us_32();
-				uint8_t idle_ok = 0;
-
-				b0 = 0;
-				b1 = 0;
-				b2 = 0;
-				b3 = 0;
-				rpt = 0;
-				mode = 0;
-				err = 2;
-
-				// First, require the IR input to be HIGH and stable for 20ms.
-				// This avoids starting capture from the middle of NEC data bits.
-				while ((uint32_t)(time_us_32() - wait_start) <= total_wait_us)
+				while ((uint32_t)(time_us_32() - wait_start) <= total_wait_us &&
+							 gpio_get(gpio) == 0)
 				{
-					while ((uint32_t)(time_us_32() - wait_start) <= total_wait_us &&
-								 gpio_get(gpio) == 0)
+					// wait until current LOW activity ends
+				}
+
+				uint32_t high_start = time_us_32();
+
+				while ((uint32_t)(time_us_32() - wait_start) <= total_wait_us &&
+							 gpio_get(gpio) != 0)
+				{
+					if ((uint32_t)(time_us_32() - high_start) >= idle_high_us)
 					{
-						// wait until current LOW activity ends
+						idle_ok = 1;
+						break;
 					}
+				}
 
-					uint32_t high_start = time_us_32();
+				if (idle_ok)
+				{
+					break;
+				}
+			}
 
-					while ((uint32_t)(time_us_32() - wait_start) <= total_wait_us &&
-								 gpio_get(gpio) != 0)
-					{
-						if ((uint32_t)(time_us_32() - high_start) >= idle_high_us)
-						{
-							idle_ok = 1;
-							break;
-						}
-					}
+			if (!idle_ok)
+			{
+				err = 2;
+			}
+			else
+			{
+				// Now wait for the next LOW. This should be the start of a NEC frame
+				// or repeat frame, not a data-bit LOW in the middle of a frame.
+				uint32_t low_wait_start = time_us_32();
 
-					if (idle_ok)
+				while ((uint32_t)(time_us_32() - low_wait_start) <= total_wait_us)
+				{
+					if (gpio_get(gpio) == 0)
 					{
 						break;
 					}
 				}
 
-				if (!idle_ok)
+				if (gpio_get(gpio) != 0)
 				{
 					err = 2;
 				}
 				else
 				{
-					// Now wait for the next LOW. This should be the start of a NEC frame
-					// or repeat frame, not a data-bit LOW in the middle of a frame.
-					uint32_t low_wait_start = time_us_32();
-
-					while ((uint32_t)(time_us_32() - low_wait_start) <= total_wait_us)
-					{
-						if (gpio_get(gpio) == 0)
-						{
-							break;
-						}
-					}
-
-					if (gpio_get(gpio) != 0)
-					{
-						err = 2;
-					}
-					else
-					{
-						err = ir_pio_capture_decode_rp2350(
-								base,
-								&b0,
-								&b1,
-								&b2,
-								&b3,
-								&rpt,
-								&mode);
-					}
+					err = ir_pio_capture_decode_rp2350(
+							base,
+							&b0,
+							&b1,
+							&b2,
+							&b3,
+							&rpt,
+							&mode);
 				}
-
-				if (err == 0)
-				{
-					break;
-				}
-
-				// Keep repeat if no normal code is found later.
-				if (err == 7)
-				{
-					best_err = err;
-					best_rpt = rpt;
-					best_mode = mode;
-				}
-				else if (best_err != 7)
-				{
-					best_err = err;
-					best_rpt = rpt;
-					best_mode = mode;
-				}
-			}
-
-			if (err != 0)
-			{
-				b0 = 0;
-				b1 = 0;
-				b2 = 0;
-				b3 = 0;
-				err = best_err;
-				rpt = best_rpt;
-				mode = best_mode;
 			}
 		}
 #else
@@ -5338,6 +5298,7 @@ S_INLINE void command_ir_in()
 	*basic_getArrayPtr(base + 4) = rpt;
 	*basic_getArrayPtr(base + 5) = err;
 	*basic_getArrayPtr(base + 6) = mode;
+
 }
 
 // ===== MODIFIED (Givetake BASIC) =====
