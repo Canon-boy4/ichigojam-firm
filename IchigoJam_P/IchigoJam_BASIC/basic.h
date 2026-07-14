@@ -4324,7 +4324,7 @@ static volatile int ir_dbg_leader_high_rp2350 = -1;
 // while HSTX/DVI is running.
 #define IR_PIO_GPIO_RP2350 7
 #define IR_PIO_SAMPLE_US_RP2350 50
-#define IR_PIO_WORD_BUF_SIZE_RP2350 128
+#define IR_PIO_WORD_BUF_SIZE_RP2350 256
 #define IR_PIO_DMA_CHAN_RP2350 10
 
 static PIO ir_pio_rp2350 = pio0;
@@ -4526,6 +4526,21 @@ static int ir_pio_measure_level_rp2350(
 	return (*pos - start) * IR_PIO_SAMPLE_US_RP2350;
 }
 
+static int ir_pio_clip_basic_value_rp2350(int v)
+{
+	if (v > 32767)
+	{
+		return 32767;
+	}
+
+	if (v < -32768)
+	{
+		return -32768;
+	}
+
+	return v;
+}
+
 static void ir_pio_export_pulses_rp2350(
 		int base,
 		uint32_t *words,
@@ -4552,17 +4567,159 @@ static void ir_pio_export_pulses_rp2350(
 
 		int width_us = (pos - start) * IR_PIO_SAMPLE_US_RP2350;
 
-		if (level == 0)
+		if (level != 0)
 		{
-			*basic_getArrayPtr(base + out) = width_us;
+			width_us = -width_us;
 		}
-		else
-		{
-			*basic_getArrayPtr(base + out) = -width_us;
-		}
+
+		*basic_getArrayPtr(base + out) = ir_pio_clip_basic_value_rp2350(width_us);
 
 		out++;
 	}
+}
+
+static int ir_pio_try_decode_nec_at_rp2350(
+		uint32_t *words,
+		int total_samples,
+		int leader_start,
+		int *out_low_us,
+		int *out_high_us,
+		uint8_t *b0,
+		uint8_t *b1,
+		uint8_t *b2,
+		uint8_t *b3,
+		uint8_t *rpt,
+		uint8_t *mode)
+{
+	int pos = leader_start;
+
+	*out_low_us = -1;
+	*out_high_us = -1;
+	*rpt = 0;
+	*mode = 0;
+
+	if (pos >= total_samples)
+	{
+		return 3;
+	}
+
+	if (ir_pio_get_sample_rp2350(words, pos) != 0)
+	{
+		return 3;
+	}
+
+	int low_us = ir_pio_measure_level_rp2350(words, total_samples, &pos, 0);
+
+	if (pos >= total_samples)
+	{
+		return 3;
+	}
+
+	if (ir_pio_get_sample_rp2350(words, pos) != 1)
+	{
+		return 3;
+	}
+
+	int high_us = ir_pio_measure_level_rp2350(words, total_samples, &pos, 1);
+
+	*out_low_us = low_us;
+	*out_high_us = high_us;
+
+	// Captured leader LOW may be partial because capture may start after
+	// the physical leader LOW already began.
+	if (low_us < 50 || low_us > 11500)
+	{
+		return 3;
+	}
+
+	// NEC repeat frame. Keep stricter than normal because repeat contains
+	// no 32-bit code.
+	if (low_us >= 1000 && high_us >= 1800 && high_us <= 3000)
+	{
+		*rpt = 1;
+		return 7;
+	}
+
+	// NEC normal frame leader HIGH.
+	if (high_us < 3500 || high_us > 5800)
+	{
+		return 3;
+	}
+
+	uint32_t data = 0;
+
+	for (int i = 0; i < 32; i++)
+	{
+		if (pos >= total_samples)
+		{
+			return 4;
+		}
+
+		if (ir_pio_get_sample_rp2350(words, pos) != 0)
+		{
+			return 4;
+		}
+
+		int bit_low_us = ir_pio_measure_level_rp2350(words, total_samples, &pos, 0);
+
+		if (bit_low_us < 250 || bit_low_us > 1000)
+		{
+			return 4;
+		}
+
+		if (pos >= total_samples)
+		{
+			return 5;
+		}
+
+		if (ir_pio_get_sample_rp2350(words, pos) != 1)
+		{
+			return 5;
+		}
+
+		int bit_high_us = ir_pio_measure_level_rp2350(words, total_samples, &pos, 1);
+
+		if (bit_high_us < 200 || bit_high_us > 2500)
+		{
+			return 5;
+		}
+
+		if (bit_high_us > 1100)
+		{
+			data |= (1u << i);
+		}
+	}
+
+	{
+		uint8_t rx0 = data & 0xff;
+		uint8_t rx1 = (data >> 8) & 0xff;
+		uint8_t rx2 = (data >> 16) & 0xff;
+		uint8_t rx3 = (data >> 24) & 0xff;
+
+		if ((uint8_t)(rx2 ^ rx3) != 0xff)
+		{
+			return 6;
+		}
+
+		if ((uint8_t)(rx0 ^ rx1) == 0xff)
+		{
+			*b0 = rx0;
+			*b1 = rx1;
+			*b2 = rx2;
+			*b3 = rx3;
+			*mode = 0;
+		}
+		else
+		{
+			*b0 = rx1;
+			*b1 = rx0;
+			*b2 = rx2;
+			*b3 = rx3;
+			*mode = 1;
+		}
+	}
+
+	return 0;
 }
 
 static int ir_pio_capture_decode_export_rp2350(
@@ -4597,7 +4754,7 @@ static int ir_pio_capture_decode_export_rp2350(
 	int nwords = ir_pio_capture_words_rp2350(
 			words,
 			IR_PIO_WORD_BUF_SIZE_RP2350,
-			120000);
+			250000);
 
 	*basic_getArrayPtr(base + 9) = nwords;
 
@@ -4624,151 +4781,81 @@ static int ir_pio_capture_decode_export_rp2350(
 	// Always export raw pulses from the first LOW for debug.
 	ir_pio_export_pulses_rp2350(base, words, total_samples, first_low);
 
-	// Search for NEC leader.
-	//
-	// Because PIO capture starts after CPU detects LOW, leader LOW may be
-	// shorter than 9000us. Accept a partial leader LOW down to 500us.
-	//
-	// Normal:
-	//   LOW  partial..9000us
-	//   HIGH about 4500us
-	//
-	// Repeat:
-	//   LOW  partial..9000us
-	//   HIGH about 2250us
-	int pos = first_low;
-
-	while (pos < total_samples)
+	// Search the whole captured buffer for a decodable NEC frame.
+	// This is important because IR.IN may start while a previous NEC frame is
+	// already in progress. In that case the first LOW in the buffer may be a
+	// data-bit LOW, not the leader LOW.
 	{
-		while (pos < total_samples && ir_pio_get_sample_rp2350(words, pos) != 0)
+		int best_err = 3;
+
+		for (int scan = first_low; scan < total_samples; scan++)
 		{
-			pos++;
-		}
-
-		if (pos >= total_samples)
-		{
-			break;
-		}
-
-		int leader_start = pos;
-		int low_us = ir_pio_measure_level_rp2350(words, total_samples, &pos, 0);
-
-		if (pos >= total_samples)
-		{
-			break;
-		}
-
-		int high_us = ir_pio_measure_level_rp2350(words, total_samples, &pos, 1);
-
-		// Reject clearly impossible leader LOW.
-		// For PIO capture, the capture can start near the end of leader LOW,
-		// so a normal frame may have a very short captured LOW followed by
-		// a valid 4.5ms leader HIGH.
-		if (low_us < 50 || low_us > 11500)
-		{
-			continue;
-		}
-
-		// Store candidate leader widths for debug.
-		*basic_getArrayPtr(base + 7) = low_us;
-		ir_dbg_leader_high_rp2350 = high_us;
-
-		// NEC repeat frame.
-		// Be stricter for repeat, because repeat has no 32-bit code.
-		// Avoid treating a data-bit fragment as repeat.
-		if (low_us >= 1000 && high_us >= 1800 && high_us <= 3000)
-		{
-			*rpt = 1;
-			ir_pio_export_pulses_rp2350(base, words, total_samples, leader_start);
-			return 7;
-		}
-
-		// NEC normal frame leader HIGH.
-		// For normal frames, accept very short captured leader LOW if the
-		// following HIGH is clearly the 4.5ms leader HIGH.
-		if (high_us < 3500 || high_us > 5800)
-		{
-			continue;
-		}
-
-		// Export pulses aligned at the accepted leader.
-		ir_pio_export_pulses_rp2350(base, words, total_samples, leader_start);
-
-		uint32_t data = 0;
-
-		for (int i = 0; i < 32; i++)
-		{
-			if (pos >= total_samples)
+			if (ir_pio_get_sample_rp2350(words, scan) != 0)
 			{
-				return 4;
+				continue;
 			}
 
-			// Data bit must start with LOW.
-			if (ir_pio_get_sample_rp2350(words, pos) != 0)
+			// Only try at the beginning of a LOW run.
+			if (scan > 0 && ir_pio_get_sample_rp2350(words, scan - 1) == 0)
 			{
-				return 4;
+				continue;
 			}
 
-			int bit_low_us = ir_pio_measure_level_rp2350(words, total_samples, &pos, 0);
+			int low_us = -1;
+			int high_us = -1;
 
-			if (bit_low_us < 250 || bit_low_us > 1000)
+			uint8_t tb0 = *b0;
+			uint8_t tb1 = *b1;
+			uint8_t tb2 = *b2;
+			uint8_t tb3 = *b3;
+			uint8_t trpt = 0;
+			uint8_t tmode = 0;
+
+			int r = ir_pio_try_decode_nec_at_rp2350(
+					words,
+					total_samples,
+					scan,
+					&low_us,
+					&high_us,
+					&tb0,
+					&tb1,
+					&tb2,
+					&tb3,
+					&trpt,
+					&tmode);
+
+			// Store the latest plausible leader-like candidate for debug.
+			if (high_us >= 1800 && high_us <= 5800)
 			{
-				return 4;
+				*basic_getArrayPtr(base + 7) = low_us;
+				ir_dbg_leader_high_rp2350 = high_us;
 			}
 
-			if (pos >= total_samples)
+			if (r == 0 || r == 7)
 			{
-				return 5;
+				*b0 = tb0;
+				*b1 = tb1;
+				*b2 = tb2;
+				*b3 = tb3;
+				*rpt = trpt;
+				*mode = tmode;
+
+				*basic_getArrayPtr(base + 7) = low_us;
+				ir_dbg_leader_high_rp2350 = high_us;
+
+				ir_pio_export_pulses_rp2350(base, words, total_samples, scan);
+				return r;
 			}
 
-			if (ir_pio_get_sample_rp2350(words, pos) != 1)
+			// Preserve the most specific failure if we found a normal leader but
+			// failed during data decode.
+			if (high_us >= 3500 && high_us <= 5800 && r > best_err)
 			{
-				return 5;
-			}
-
-			int bit_high_us = ir_pio_measure_level_rp2350(words, total_samples, &pos, 1);
-
-			if (bit_high_us < 200 || bit_high_us > 2500)
-			{
-				return 5;
-			}
-
-			if (bit_high_us > 1100)
-			{
-				data |= (1u << i);
+				best_err = r;
 			}
 		}
 
-		{
-			uint8_t rx0 = data & 0xff;
-			uint8_t rx1 = (data >> 8) & 0xff;
-			uint8_t rx2 = (data >> 16) & 0xff;
-			uint8_t rx3 = (data >> 24) & 0xff;
-
-			if ((uint8_t)(rx2 ^ rx3) != 0xff)
-			{
-				return 6;
-			}
-
-			if ((uint8_t)(rx0 ^ rx1) == 0xff)
-			{
-				*b0 = rx0;
-				*b1 = rx1;
-				*b2 = rx2;
-				*b3 = rx3;
-				*mode = 0;
-			}
-			else
-			{
-				*b0 = rx1;
-				*b1 = rx0;
-				*b2 = rx2;
-				*b3 = rx3;
-				*mode = 1;
-			}
-		}
-
-		return 0;
+		return best_err;
 	}
 
 	return 3;
