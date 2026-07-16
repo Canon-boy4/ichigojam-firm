@@ -4318,33 +4318,40 @@ static int ir_measure_pulse_us(int gpio, int level, uint32_t timeout_us)
 
 #ifdef PICO_RP2350
 
-// PIO sampling debug for RP2350 IN4/GPIO7.
-// This is only for checking whether PIO can capture NEC IR waveform
-// while HSTX/DVI is running.
-#define IR_PIO_GPIO_RP2350 7
+// RP2350版 IR.IN 用 PIOサンプリング設定。
+// HSTX/DVI動作中でも赤外線NEC波形を安定して取り込むため、
+// PIOで入力LOWを待ち、DMAでサンプル列を取得する。
 #define IR_PIO_SAMPLE_US_RP2350 50
 #define IR_PIO_WORD_BUF_SIZE_RP2350 256
 #define IR_PIO_DMA_CHAN_RP2350 10
+
+// RP2350版 IR.IN で、赤外線入力の先頭LOWを待つ最大時間。
+// 長くすると無信号時の待ち時間が増えるため、最終版では20msにする。
+// NEC信号の先頭LOWをPIO側で待ち、LOW検出後にDMAで波形を取り込む。
+#define IR_PIO_WAIT_US_RP2350 20000
 
 static PIO ir_pio_rp2350 = pio0;
 static uint ir_pio_sm_rp2350 = 0;
 static uint ir_pio_offset_rp2350 = 0;
 static int ir_pio_dma_chan_rp2350 = -1;
 static uint8_t ir_pio_ready_rp2350 = 0;
+static pio_sm_config ir_pio_sm_config_rp2350;
 static int ir_dbg_leader_high_rp2350 = -1;
 
 static const uint16_t ir_pio_sample_program_instructions_rp2350[] = {
-		// in pins, 1
-		// PIO instruction encoding:
-		//   IN opcode = 0x4000
-		//   source pins = 0
-		//   bit count = 1
+		// 1命令目は pio_add_program() 後に jmp pin, offset へ書き換える。
+		// 指定GPIOがHIGHの間はここで待機し、LOWになったら次の命令へ進む。
+		// これにより、赤外線信号の先頭LOWをPIO側で待ち受ける。
+		0x0000,
+
+		// GPIO入力を1bitずつISRへ取り込む。
+		// 32bit分たまるとRX FIFOへpushされ、DMAでwords[]へ転送する。
 		0x4001,
 };
 
 static const struct pio_program ir_pio_sample_program_rp2350 = {
 		.instructions = ir_pio_sample_program_instructions_rp2350,
-		.length = 1,
+		.length = 2,
 		.origin = -1,
 };
 
@@ -4355,46 +4362,47 @@ static void ir_pio_capture_init_rp2350(void)
 		return;
 	}
 
-	gpio_init(IR_PIO_GPIO_RP2350);
-	gpio_set_dir(IR_PIO_GPIO_RP2350, GPIO_IN);
-	gpio_pull_up(IR_PIO_GPIO_RP2350);
+	// 入力GPIOは IR.IN のポート番号で変わるため、ここでは初期化しない。
+	// 実際のGPIO設定は ir_pio_capture_words_rp2350() で毎回行う。
 
-	pio_gpio_init(ir_pio_rp2350, IR_PIO_GPIO_RP2350);
+	ir_pio_offset_rp2350 = pio_add_program(ir_pio_rp2350, &ir_pio_sample_program_rp2350);
 
-	ir_pio_offset_rp2350 = pio_add_program(
-			ir_pio_rp2350,
-			&ir_pio_sample_program_rp2350);
+	// PIOのJMP先はPIO命令メモリ上の絶対アドレス。
+	// pio_add_program() の配置先が0とは限らないため、
+	// 1命令目を「jmp pin, ir_pio_offset_rp2350」に書き換える。
+	// これで指定GPIOがHIGHの間は先頭命令で待機し、LOWでサンプリングへ進む。
+	uint16_t jmp_pin_instr = pio_encode_jmp_pin(ir_pio_offset_rp2350);
+	ir_pio_rp2350->instr_mem[ir_pio_offset_rp2350] = jmp_pin_instr;
 
 	pio_sm_config c = pio_get_default_sm_config();
 
-	sm_config_set_in_pins(&c, IR_PIO_GPIO_RP2350);
+	// 入力GPIOは IR.IN のポート番号で変わるため、ここでは固定しない。
+	// sm_config_set_in_pins() と sm_config_set_jmp_pin() は
+	// ir_pio_capture_words_rp2350() 側で実行時GPIOに合わせて設定する。
 
-	// This program has only one instruction.
-	// Force the state machine to loop on that one instruction.
-	sm_config_set_wrap(
-			&c,
-			ir_pio_offset_rp2350,
-			ir_pio_offset_rp2350);
+	sm_config_set_wrap(&c, ir_pio_offset_rp2350 + 1, ir_pio_offset_rp2350 + 1);
 
-	// Use the whole FIFO as RX FIFO.
+	// FIFO全体をRX FIFOとして使用する。
 	sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_RX);
 
-	// Shift left, autopush every 32 samples.
-	// In the export code below, bit31 is treated as the oldest sample.
+	// 左シフトで取り込み、32サンプルごとに自動でRX FIFOへpushする。
+	// 後段の展開処理では bit31 を最も古いサンプルとして扱う。
 	sm_config_set_in_shift(&c, false, true, 32);
 
-	// One PIO instruction per sample.
-	// Sample period = 50us, sample rate = 20000Hz.
+	// 1サンプルにつきPIO命令を1回実行する。
+	// サンプル周期は50us、サンプル周波数は20000Hz。
 	float div = (float)clock_get_hz(clk_sys) /
 							(1000000.0f / (float)IR_PIO_SAMPLE_US_RP2350);
 
 	sm_config_set_clkdiv(&c, div);
 
+	ir_pio_sm_config_rp2350 = c;
+
 	pio_sm_init(
 			ir_pio_rp2350,
 			ir_pio_sm_rp2350,
 			ir_pio_offset_rp2350,
-			&c);
+			&ir_pio_sm_config_rp2350);
 
 	pio_sm_set_enabled(ir_pio_rp2350, ir_pio_sm_rp2350, false);
 
@@ -4415,14 +4423,19 @@ static void ir_pio_capture_stop_clear_rp2350(void)
 	pio_sm_restart(ir_pio_rp2350, ir_pio_sm_rp2350);
 }
 
-static int ir_pio_capture_words_rp2350(uint32_t *words, int max_words, uint32_t capture_us)
+static int ir_pio_capture_words_rp2350(uint gpio, uint32_t *words, int max_words, uint32_t capture_us)
 {
-	// DMA version:
-	// PIO RX FIFO -> words[]
+	// PIO + DMAで赤外線入力をサンプリングする。
+	// gpioは IR.IN のポート番号から求めた実GPIO。
+	// IN1〜IN4のいずれでも同じPIOプログラムを使い、
+	// 実行時に in_pins / jmp_pin を切り替える。
+
+	// DMA版:
+	// PIO RX FIFO から words[] へ32bit単位で転送する。
 	//
-	// At 50us/sample, 32 samples/word:
+	// 50us/sample、32 samples/word のため:
 	//   1 word = 1600us
-	//   120000us -> 75 words
+	//   250000us -> 約157 words
 	int want_words = (int)((capture_us + (IR_PIO_SAMPLE_US_RP2350 * 32 - 1)) /
 												 (IR_PIO_SAMPLE_US_RP2350 * 32));
 
@@ -4441,18 +4454,37 @@ static int ir_pio_capture_words_rp2350(uint32_t *words, int max_words, uint32_t 
 		words[i] = 0;
 	}
 
+	// IR.INで指定されたGPIOをPIO入力として使う。
+	// GPIO固定にするとIN4専用になってしまうため、ここで毎回設定する。
+	gpio_init(gpio);
+	gpio_set_dir(gpio, GPIO_IN);
+	gpio_pull_up(gpio);
+	pio_gpio_init(ir_pio_rp2350, gpio);
+
 	ir_pio_capture_stop_clear_rp2350();
 
-	dma_channel_config dc = dma_channel_get_default_config(ir_pio_dma_chan_rp2350);
+	// 初期化時に保存した共通SM設定を元に、今回使うGPIOだけを差し替える。
+	pio_sm_config smc = ir_pio_sm_config_rp2350;
 
+	sm_config_set_in_pins(&smc, gpio);
+	sm_config_set_jmp_pin(&smc, gpio);
+
+	pio_sm_init(
+			ir_pio_rp2350,
+			ir_pio_sm_rp2350,
+			ir_pio_offset_rp2350,
+			&smc);
+
+	pio_sm_set_enabled(ir_pio_rp2350, ir_pio_sm_rp2350, false);
+	pio_sm_clear_fifos(ir_pio_rp2350, ir_pio_sm_rp2350);
+
+	dma_channel_config dc = dma_channel_get_default_config(ir_pio_dma_chan_rp2350);
 	channel_config_set_transfer_data_size(&dc, DMA_SIZE_32);
 	channel_config_set_read_increment(&dc, false);
 	channel_config_set_write_increment(&dc, true);
 
-	// false = RX DREQ
-	channel_config_set_dreq(
-			&dc,
-			pio_get_dreq(ir_pio_rp2350, ir_pio_sm_rp2350, false));
+	// false指定でRX FIFO用DREQを取得する。
+	channel_config_set_dreq(&dc, pio_get_dreq(ir_pio_rp2350, ir_pio_sm_rp2350, false));
 
 	dma_channel_configure(
 			ir_pio_dma_chan_rp2350,
@@ -4463,12 +4495,17 @@ static int ir_pio_capture_words_rp2350(uint32_t *words, int max_words, uint32_t 
 			false);
 
 	dma_channel_start(ir_pio_dma_chan_rp2350);
+
 	pio_sm_set_enabled(ir_pio_rp2350, ir_pio_sm_rp2350, true);
 
-	// Wait for DMA completion, with a safety timeout.
-	// Expected completion time is roughly capture_us.
+	// DMA完了を待つ。無信号時に固まらないようtimeoutを設ける。
+	// 完了までの想定時間は「先頭LOW待ち時間 + capture_us」。
 	uint32_t start = time_us_32();
-	uint32_t timeout_us = capture_us + 50000;
+
+	// PIOは最初のLOWを待ってからサンプリングを開始する。
+	// 無信号時の待ち時間を短くするため、LOW待ちは20msに抑える。
+	// LOW検出後はcapture_us分のサンプルをDMAで取得する。
+	uint32_t timeout_us = IR_PIO_WAIT_US_RP2350 + capture_us + 50000;
 
 	while (dma_channel_is_busy(ir_pio_dma_chan_rp2350))
 	{
@@ -4481,10 +4518,10 @@ static int ir_pio_capture_words_rp2350(uint32_t *words, int max_words, uint32_t 
 	pio_sm_set_enabled(ir_pio_rp2350, ir_pio_sm_rp2350, false);
 
 	int done_words = want_words;
-
 	if (dma_channel_is_busy(ir_pio_dma_chan_rp2350))
 	{
-		// Timeout. Abort DMA and report how many words were likely written.
+		// LOW待ちまたはDMA転送中にtimeoutした。
+		// timeout時はDMAを止め、転送済みword数だけを返す。
 		uint32_t remaining = dma_channel_hw_addr(ir_pio_dma_chan_rp2350)->transfer_count;
 
 		dma_channel_abort(ir_pio_dma_chan_rp2350);
@@ -4573,22 +4610,22 @@ static int ir_pio_try_decode_nec_at_rp2350(
 	*out_low_us = low_us;
 	*out_high_us = high_us;
 
-	// Captured leader LOW may be partial because capture may start after
-	// the physical leader LOW already began.
+	// 取り込み開始が物理的なリーダLOWの途中になる場合があるため、
+	// リーダLOWは途中から取得されたものでも許容する。
 	if (low_us < 50 || low_us > 11500)
 	{
 		return 3;
 	}
 
-	// NEC repeat frame. Keep stricter than normal because repeat contains
-	// no 32-bit code.
+	// NEC repeatフレーム。
+	// repeatには32bitコードが含まれないため、通常フレームより厳しめに判定する。
 	if (low_us >= 1000 && high_us >= 1800 && high_us <= 3000)
 	{
 		*rpt = 1;
 		return 7;
 	}
 
-	// NEC normal frame leader HIGH.
+	// NEC通常フレームのリーダHIGH。
 	if (high_us < 3500 || high_us > 5800)
 	{
 		return 3;
@@ -4671,6 +4708,7 @@ static int ir_pio_try_decode_nec_at_rp2350(
 }
 
 static int ir_pio_capture_decode_rp2350(
+		uint gpio,
 		int base,
 		uint8_t *b0,
 		uint8_t *b1,
@@ -4687,14 +4725,13 @@ static int ir_pio_capture_decode_rp2350(
 
 	ir_pio_capture_init_rp2350();
 
-	// Capture 120ms.
-	// Current command_ir_in() waits for GPIO LOW before this call,
-	// so leader LOW may be partially captured. The decoder allows that.
+	// RP2350版ではPIOが先頭LOWを待ってからサンプリングを開始する。
+	// 取得したサンプル列全体からNEC通常フレームまたはrepeatフレームを探す。
 	int nwords = ir_pio_capture_words_rp2350(
+			gpio,
 			words,
 			IR_PIO_WORD_BUF_SIZE_RP2350,
 			250000);
-
 	if (nwords <= 0)
 	{
 		return 2;
@@ -4702,8 +4739,8 @@ static int ir_pio_capture_decode_rp2350(
 
 	int total_samples = nwords * 32;
 
-	// Find the first LOW sample.
-	// IR receiver output is normally HIGH and active LOW.
+	// 最初のLOWサンプルを探す。
+	// 赤外線受信モジュールの出力は通常HIGH、受信時LOW。
 	int first_low = 0;
 	while (first_low < total_samples && ir_pio_get_sample_rp2350(words, first_low) != 0)
 	{
@@ -4715,10 +4752,9 @@ static int ir_pio_capture_decode_rp2350(
 		return 2;
 	}
 
-	// Search the whole captured buffer for a decodable NEC frame.
-	// This is important because IR.IN may start while a previous NEC frame is
-	// already in progress. In that case the first LOW in the buffer may be a
-	// data-bit LOW, not the leader LOW.
+	// 取得したバッファ全体から復号可能なNECフレームを探す。
+	// IR.IN開始時点で既に前のNECフレームが進行中の場合、
+	// バッファ内の最初のLOWがリーダLOWではなくデータbitのLOWである可能性がある。
 	{
 		int best_err = 3;
 
@@ -4729,7 +4765,7 @@ static int ir_pio_capture_decode_rp2350(
 				continue;
 			}
 
-			// Only try at the beginning of a LOW run.
+			// LOW区間の先頭だけを復号開始候補にする。
 			if (scan > 0 && ir_pio_get_sample_rp2350(words, scan - 1) == 0)
 			{
 				continue;
@@ -4758,7 +4794,7 @@ static int ir_pio_capture_decode_rp2350(
 					&trpt,
 					&tmode);
 
-			if (r == 0 || r == 7)
+			if (r == 0)
 			{
 				*b0 = tb0;
 				*b1 = tb1;
@@ -4767,11 +4803,21 @@ static int ir_pio_capture_decode_rp2350(
 				*rpt = trpt;
 				*mode = tmode;
 
-				return r;
+				return 0;
 			}
 
-			// Preserve the most specific failure if we found a normal leader but
-			// failed during data decode.
+			if (r == 7)
+			{
+				// repeatフレームを見つけても、すぐには返さない。
+				// IR.IN 1回の呼び出しでは、通常NECフレームを優先して探す。
+				best_err = 7;
+				*rpt = trpt;
+				*mode = tmode;
+				continue;
+			}
+
+			// 通常リーダらしい波形を見つけた後でデータ復号に失敗した場合は、
+			// より具体的なエラーコードを残す。
 			if (high_us >= 3500 && high_us <= 5800 && r > best_err)
 			{
 				best_err = r;
@@ -4786,8 +4832,8 @@ static int ir_pio_capture_decode_rp2350(
 
 static int ir_wait_low_rp2350(int gpio, uint32_t timeout_us)
 {
-	// Interrupts are enabled while waiting for the first LOW.
-	// This avoids stopping USB/HSTX for a long no-signal wait.
+	// 最初のLOWを待つ間は割り込みを有効のままにする。
+	// 無信号時の長い待ち時間でUSB/HSTXを止めないため。
 	uint32_t start = time_us_32();
 
 	while (gpio_get(gpio) != 0)
@@ -4807,13 +4853,11 @@ static int ir_acquire_nec_leader_rp2350(
 		int *out_high,
 		uint8_t *rpt)
 {
-	// Caller must already have disabled interrupts.
+	// 呼び出し元で既に割り込みを止めていること。
+	// この関数は、入力が既にLOWになっている前提で処理する。
+	// 残りのLOW幅と、それに続くHIGH幅を連続して測定する。
 	//
-	// This function assumes the input is already LOW.
-	// It measures the remaining LOW width and the following HIGH width
-	// continuously.
-	//
-	// Accept LOW from 7ms to catch a leader LOW that was entered late.
+	// リーダLOWの途中から測定を開始した場合にも対応するため、7ms以上を許容する。
 
 	const uint32_t low_timeout_us = 15000;
 	const uint32_t high_timeout_us = 8000;
@@ -4826,13 +4870,13 @@ static int ir_acquire_nec_leader_rp2350(
 	*rpt = 0;
 	ir_dbg_leader_high_rp2350 = -1;
 
-	// Must still be LOW when we start measuring.
+	// 測定開始時点でもLOWである必要がある。
 	if (gpio_get(gpio) != 0)
 	{
 		return 2;
 	}
 
-	// Measure LOW from the current point.
+	// 現在位置からLOW幅を測定する。
 	uint32_t low_start = time_us_32();
 
 	while (gpio_get(gpio) == 0)
@@ -4849,13 +4893,13 @@ static int ir_acquire_nec_leader_rp2350(
 	int t_low = (int)(time_us_32() - low_start);
 	*out_low = t_low;
 
-	// Now L=7000..11500 is accepted as a leader candidate.
+	// この時点では L=7000..11500 をリーダ候補として受け入れる。
 	if (t_low < leader_low_min || t_low > leader_low_max)
 	{
 		return 2;
 	}
 
-	// Immediately measure the HIGH following this LOW.
+	// 続けて、このLOWの直後のHIGH幅を測定する。
 	uint32_t high_start = time_us_32();
 
 	while (gpio_get(gpio) != 0)
@@ -4870,14 +4914,14 @@ static int ir_acquire_nec_leader_rp2350(
 	*out_high = t_high;
 	ir_dbg_leader_high_rp2350 = t_high;
 
-	// Repeat frame: about 2.25ms HIGH.
+	// repeatフレーム: HIGHは約2.25ms。
 	if (t_high > 1800 && t_high < 3000)
 	{
 		*rpt = 1;
 		return 0;
 	}
 
-	// Normal frame: about 4.5ms HIGH.
+	// 通常フレーム: HIGHは約4.5ms。
 	if (t_high >= 3500 && t_high <= 5500)
 	{
 		*rpt = 0;
@@ -4888,25 +4932,26 @@ static int ir_acquire_nec_leader_rp2350(
 }
 #endif
 
-// ===== MODIFIED (Givetake BASIC) =====
-// Decode NEC / NEC-extended frame AFTER leader-low has already been detected.
+// ===== 変更箇所 (Givetake BASIC) =====
+// リーダLOW検出後に、NEC / NEC拡張フレームを復号する。
 //
-// Preconditions:
-// - The first 9ms LOW leader pulse has already been detected.
-// - This function starts from the leader-high period.
-// - Caller disables interrupts during this function.
+// 前提:
+// - 先頭の約9ms LOWリーダパルスは検出済み。
+// - この関数はリーダHIGH区間から処理を開始する。
+// - 呼び出し元はこの関数の実行中、割り込みを停止する。
 //
-// Return bytes:
-//   b0,b1,b2,b3 = frame bytes in display order
-//   rpt         = repeat flag
-//   mode        = 0 standard NEC / 1 NEC extended
+// 戻り値:
+//   b0,b1,b2,b3 = 表示順に並べたフレームバイト
+//   rpt         = repeatフラグ
+//   mode        = 0: 標準NEC / 1: NEC拡張
 //
-// Error codes:
-//   0 = success
-//   3 = leader-high mismatch
-//   4 = bit-low mismatch
-//   5 = bit-high timeout/mismatch
-//   6 = command inverse check error
+// エラーコード:
+//   0 = 成功
+//   3 = リーダHIGH不一致
+//   4 = bit LOW不一致
+//   5 = bit HIGH timeout / 不一致
+//   6 = command反転チェックエラー
+
 static int ir_decode_nec_after_leader_low(int gpio, uint8_t *b0, uint8_t *b1, uint8_t *b2, uint8_t *b3, uint8_t *rpt, uint8_t *mode)
 {
 	int t_low, t_high;
@@ -4916,10 +4961,10 @@ static int ir_decode_nec_after_leader_low(int gpio, uint8_t *b0, uint8_t *b1, ui
 	*mode = 0;
 
 	// ------------------------------------------------------------
-	// We arrive here AFTER leader LOW (~9ms) has been detected.
-	// Now read leader HIGH:
-	//   normal frame -> about 4.5ms
-	//   repeat frame -> about 2.25ms
+	// ここにはリーダLOW約9msを検出した後に到達する。
+	// 続けてリーダHIGHを読む:
+	//   通常フレーム -> 約4.5ms
+	//   repeatフレーム -> 約2.25ms
 	// ------------------------------------------------------------
 	t_high = ir_measure_pulse_us(gpio, 1, 7000);
 
@@ -4940,24 +4985,24 @@ static int ir_decode_nec_after_leader_low(int gpio, uint8_t *b0, uint8_t *b1, ui
 	}
 
 	// ------------------------------------------------------------
-	// Receive 32 bits, LSB first
+	// 32bitをLSB firstで受信する。
 	//
-	// Each bit:
-	//   LOW  ~560us
-	//   HIGH ~560us  -> 0
-	//   HIGH ~1690us -> 1
+	// 各bit:
+	//   LOW  約560us
+	//   HIGH 約560us  -> 0
+	//   HIGH 約1690us -> 1
 	// ------------------------------------------------------------
 	for (int i = 0; i < 32; i++)
 	{
-		// low part: about 560us
+		// LOW部分: 約560us
 		t_low = ir_measure_pulse_us(gpio, 0, 2000);
 		if (t_low < 250 || t_low > 1000)
 		{
 			return 4;
 		}
-		// high part:
-		//   0 -> about 560us
-		//   1 -> about 1690us
+		// HIGH部分:
+		//   0 -> 約560us
+		//   1 -> 約1690us
 		t_high = ir_measure_pulse_us(gpio, 1, 3000);
 		if (t_high < 200)
 		{
@@ -4971,14 +5016,14 @@ static int ir_decode_nec_after_leader_low(int gpio, uint8_t *b0, uint8_t *b1, ui
 	}
 
 	{
-		uint8_t rx0 = data & 0xff;				 // first byte received
-		uint8_t rx1 = (data >> 8) & 0xff;	 // second byte
-		uint8_t rx2 = (data >> 16) & 0xff; // third byte
-		uint8_t rx3 = (data >> 24) & 0xff; // fourth byte
+		uint8_t rx0 = data & 0xff;				 // 1バイト目
+		uint8_t rx1 = (data >> 8) & 0xff;	 // 2バイト目
+		uint8_t rx2 = (data >> 16) & 0xff; // 3バイト目
+		uint8_t rx3 = (data >> 24) & 0xff; // 4バイト目
 
 		// --------------------------------------------------------
-		// Common NEC rule:
-		//   command byte and its inverse must match
+		// NEC共通ルール:
+		//   commandバイトとその反転バイトが一致する必要がある。
 		// --------------------------------------------------------
 		if ((uint8_t)(rx2 ^ rx3) != 0xff)
 		{
@@ -4986,27 +5031,27 @@ static int ir_decode_nec_after_leader_low(int gpio, uint8_t *b0, uint8_t *b1, ui
 		}
 
 		// --------------------------------------------------------
-		// Standard NEC:
+		// 標準NEC:
 		//   rx0 = addr
 		//   rx1 = ~addr
 		//   rx2 = cmd
 		//   rx3 = ~cmd
 		//
-		// NEC extended:
+		// NEC拡張:
 		//   rx0 = addr low
 		//   rx1 = addr high
 		//   rx2 = cmd
 		//   rx3 = ~cmd
 		//
-		// We return display-order bytes.
+		// 表示順のバイト列として返す。
 		//
-		// For NEC-extended, swap the first two bytes so codes like
+		// NEC拡張では先頭2バイトを入れ替え、
 		//   807F01FE
-		// are shown in natural human-readable order.
+		// のように人が読みやすい自然な順序で表示する。
 		// --------------------------------------------------------
 		if ((uint8_t)(rx0 ^ rx1) == 0xff)
 		{
-			// standard NEC
+			// 標準NEC
 			*b0 = rx0;
 			*b1 = rx1;
 			*b2 = rx2;
@@ -5015,9 +5060,9 @@ static int ir_decode_nec_after_leader_low(int gpio, uint8_t *b0, uint8_t *b1, ui
 		}
 		else
 		{
-			// NEC extended
-			*b0 = rx1; // high byte first
-			*b1 = rx0; // low byte second
+			// NEC拡張
+			*b0 = rx1; // 上位バイトを先に返す
+			*b1 = rx0; // 下位バイトを次に返す
 			*b2 = rx2;
 			*b3 = rx3;
 			*mode = 1;
@@ -5092,31 +5137,30 @@ static int ir_decode_nec_data_bits_rp2350(
 }
 #endif
 
-// ===== MODIFIED (Givetake BASIC) =====
-// Wait for NEC leader-low (~9ms) in normal system state.
-// Only after leader-low is detected, disable interrupts
-// and decode the rest of the frame.
+// ===== 変更箇所 (Givetake BASIC) =====
+// NECリーダLOW約9msを検出してから、残りのフレームを復号する。
+// RP2350ではPIO + DMAで波形を取り込み、RP2040では従来通り割り込み停止中に測定する。
 //
-// VIDEO on/off is intentionally NOT used here because
-// restoring video caused LCD display problems.
+// VIDEO on/offは使用しない。
+// 復帰時にLCD表示へ影響する場合があったため。
 //
-// Result array:
-//   [base+0] = raw byte 0
-//   [base+1] = raw byte 1
-//   [base+2] = raw byte 2
-//   [base+3] = raw byte 3
-//   [base+4] = repeat flag
-//   [base+5] = error code
+// 結果配列:
+//   [base+0] = 受信バイト0
+//   [base+1] = 受信バイト1
+//   [base+2] = 受信バイト2
+//   [base+3] = 受信バイト3
+//   [base+4] = repeatフラグ
+//   [base+5] = エラーコード
 //   [base+6] = mode
 //
-// Error codes:
-//   0 = success
-//   1 = invalid port
-//   2 = leader-low timeout / mismatch
-//   3 = leader-high mismatch
-//   4 = bit-low mismatch
-//   5 = bit-high mismatch
-//   6 = command inverse check error
+// エラーコード:
+//   0 = 成功
+//   1 = 不正なポート
+//   2 = リーダLOW timeout / 不一致
+//   3 = リーダHIGH不一致
+//   4 = bit LOW不一致
+//   5 = bit HIGH不一致
+//   6 = command反転チェックエラー
 S_INLINE void command_ir_in()
 {
 	int port = token_expression();
@@ -5130,7 +5174,7 @@ S_INLINE void command_ir_in()
 		return;
 	}
 
-	// second argument must be [n]
+	// 第2引数は [n] でなければならない。
 	Token_get(t);
 	if (t.code != TOKEN_ARRAY)
 	{
@@ -5144,7 +5188,11 @@ S_INLINE void command_ir_in()
 	token_end();
 	IJB_ERR_CHK();
 
-	// [base] .. [base+6] を使用
+	// IR.IN は [base] .. [base+6] を使用する。
+	// [0]..[3] : 受信コード4バイト
+	// [4]     : repeatフラグ
+	// [5]     : エラーコード
+	// [6]     : 受信モード
 	if (base < 0 || base + 6 >= IJB_SIZEOF_ARRAY_MAX)
 	{
 		command_error(ERR_INDEX_OUT_OF_RANGE);
@@ -5159,19 +5207,19 @@ S_INLINE void command_ir_in()
 		*basic_getArrayPtr(base + 2) = 0;
 		*basic_getArrayPtr(base + 3) = 0;
 		*basic_getArrayPtr(base + 4) = 0;
-		*basic_getArrayPtr(base + 5) = 1; // invalid port
+		*basic_getArrayPtr(base + 5) = 1; // 不正なポート
 		*basic_getArrayPtr(base + 6) = 0;
 		return;
 	}
 
 	gpio_init(gpio);
 	gpio_set_dir(gpio, GPIO_IN);
-	gpio_pull_up(gpio); // HX1838 output is usually idle HIGH
+	gpio_pull_up(gpio); // HX1838出力は通常HIGH
 
 	// ------------------------------------------------------------
-	// Preserve previous bytes so repeat frame can keep them.
-	// This way, when repeat is received, the last decoded code
-	// remains available in [base+0] .. [base+3].
+	// repeatフレーム受信時にも直前のコードを保持できるよう、
+	// 既存の受信バイトを退避しておく。
+	// これにより、repeat受信時も [base+0] .. [base+3] に直前コードが残る。
 	// ------------------------------------------------------------
 	uint8_t b0 = (uint8_t)(*basic_getArrayPtr(base + 0));
 	uint8_t b1 = (uint8_t)(*basic_getArrayPtr(base + 1));
@@ -5183,114 +5231,44 @@ S_INLINE void command_ir_in()
 
 	// ------------------------------------------------------------
 	// Phase 1:
-	// Wait for the leader LOW (~9ms) in normal system state.
-	//
-	// We do NOT disable interrupts here, because waiting for a key
-	// press could otherwise stop the whole machine too long.
+	// 赤外線入力を復号する。
 	// ------------------------------------------------------------
-	{
 #ifdef PICO_RP2350
-		// PIO NEC decode mode for RP2350.
-		// Wait up to 1 second for IR receiver output to go LOW,
-		// then capture and decode using PIO samples.
-		ir_dbg_leader_high_rp2350 = -1;
+	// RP2350ではPIOでNEC波形を取り込んで復号する。
+	// PIOが先頭LOWを待ち、LOW検出後にDMAでサンプル列を取得する。
+	ir_dbg_leader_high_rp2350 = -1;
 
-		{
-			const uint32_t total_wait_us = 1000000;
-			const uint32_t idle_high_us = 20000;
-
-			uint32_t wait_start = time_us_32();
-			uint8_t idle_ok = 0;
-
-			// First, require the IR input to be HIGH and stable for 20ms.
-			// This avoids starting capture from the middle of NEC data bits.
-			while ((uint32_t)(time_us_32() - wait_start) <= total_wait_us)
-			{
-				while ((uint32_t)(time_us_32() - wait_start) <= total_wait_us &&
-							 gpio_get(gpio) == 0)
-				{
-					// wait until current LOW activity ends
-				}
-
-				uint32_t high_start = time_us_32();
-
-				while ((uint32_t)(time_us_32() - wait_start) <= total_wait_us &&
-							 gpio_get(gpio) != 0)
-				{
-					if ((uint32_t)(time_us_32() - high_start) >= idle_high_us)
-					{
-						idle_ok = 1;
-						break;
-					}
-				}
-
-				if (idle_ok)
-				{
-					break;
-				}
-			}
-
-			if (!idle_ok)
-			{
-				err = 2;
-			}
-			else
-			{
-				// Now wait for the next LOW. This should be the start of a NEC frame
-				// or repeat frame, not a data-bit LOW in the middle of a frame.
-				uint32_t low_wait_start = time_us_32();
-
-				while ((uint32_t)(time_us_32() - low_wait_start) <= total_wait_us)
-				{
-					if (gpio_get(gpio) == 0)
-					{
-						break;
-					}
-				}
-
-				if (gpio_get(gpio) != 0)
-				{
-					err = 2;
-				}
-				else
-				{
-					err = ir_pio_capture_decode_rp2350(
-							base,
-							&b0,
-							&b1,
-							&b2,
-							&b3,
-							&rpt,
-							&mode);
-				}
-			}
-		}
+	err = ir_pio_capture_decode_rp2350(
+			gpio,
+			base,
+			&b0,
+			&b1,
+			&b2,
+			&b3,
+			&rpt,
+			&mode);
 #else
-		int t_low = ir_measure_pulse_us(gpio, 0, 15000);
+	int t_low = ir_measure_pulse_us(gpio, 0, 15000);
 
-		if (t_low < 8000 || t_low > 10000)
-		{
-			err = 2;
-		}
-		else
-		{
-			// ----------------------------------------------------
-			// Phase 2:
-			// Leader-low detected.
-			// Now protect the timing-critical decode section.
-			// ----------------------------------------------------
-			int save = save_and_disable_interrupts();
-
-			err = ir_decode_nec_after_leader_low(gpio, &b0, &b1, &b2, &b3, &rpt, &mode);
-
-			restore_interrupts(save);
-		}
-#endif
+	if (t_low < 8000 || t_low > 10000)
+	{
+		err = 2;
 	}
+	else
+	{
+		// ----------------------------------------------------
+		// Phase 2:
+		// リーダLOWを検出済み。
+		// ここから先はタイミングが重要なため割り込みを止めて復号する。
+		// ----------------------------------------------------
+		int save = save_and_disable_interrupts();
 
-	// ------------------------------------------------------------
-	// Store result into BASIC array
-	// ------------------------------------------------------------
+		err = ir_decode_nec_after_leader_low(gpio, &b0, &b1, &b2, &b3, &rpt, &mode);
+
+		restore_interrupts(save);
+	}
+#endif
+
 	*basic_getArrayPtr(base + 0) = b0;
 	*basic_getArrayPtr(base + 1) = b1;
 	*basic_getArrayPtr(base + 2) = b2;
@@ -5298,7 +5276,6 @@ S_INLINE void command_ir_in()
 	*basic_getArrayPtr(base + 4) = rpt;
 	*basic_getArrayPtr(base + 5) = err;
 	*basic_getArrayPtr(base + 6) = mode;
-
 }
 
 // ===== MODIFIED (Givetake BASIC) =====
