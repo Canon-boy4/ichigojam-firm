@@ -137,7 +137,8 @@ void vram_to_hstx_all(bool visible_cursor) {
     const int margin_x = MARGIN_WIDTH * 2;
     const int margin_y = MARGIN_HEIGHT * 2;
 
-    // ここで hstx_video_fill() 黒塗りにしない
+    // HSTXフレームバッファ全体の消去はVIDEO 0や初期化側で行う。
+    // ここではVRAM内容だけを文字描画領域へ反映する。
 
     for (int vram_y = 0; vram_y < SCREEN_H; vram_y++) {
         for (int font_y = 0; font_y < FONT_SIZE; font_y++) {

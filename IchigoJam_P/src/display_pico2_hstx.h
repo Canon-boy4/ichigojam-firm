@@ -16,21 +16,21 @@
 // -----------------------------------------------------------------------------
 // 640x480@60Hz DVI timing
 
-#define HSTX_MODE_H_FRONT_PORCH   16
-#define HSTX_MODE_H_SYNC_WIDTH    96
-#define HSTX_MODE_H_BACK_PORCH    48
+#define HSTX_MODE_H_FRONT_PORCH 16
+#define HSTX_MODE_H_SYNC_WIDTH 96
+#define HSTX_MODE_H_BACK_PORCH 48
 #define HSTX_MODE_H_ACTIVE_PIXELS 640
 
-#define HSTX_MODE_V_FRONT_PORCH   10
-#define HSTX_MODE_V_SYNC_WIDTH    2
-#define HSTX_MODE_V_BACK_PORCH    33
-#define HSTX_MODE_V_ACTIVE_LINES  480
+#define HSTX_MODE_V_FRONT_PORCH 10
+#define HSTX_MODE_V_SYNC_WIDTH 2
+#define HSTX_MODE_V_BACK_PORCH 33
+#define HSTX_MODE_V_ACTIVE_LINES 480
 
-#define HSTX_MODE_H_TOTAL_PIXELS \
+#define HSTX_MODE_H_TOTAL_PIXELS                        \
     (HSTX_MODE_H_FRONT_PORCH + HSTX_MODE_H_SYNC_WIDTH + \
      HSTX_MODE_H_BACK_PORCH + HSTX_MODE_H_ACTIVE_PIXELS)
 
-#define HSTX_MODE_V_TOTAL_LINES \
+#define HSTX_MODE_V_TOTAL_LINES                         \
     (HSTX_MODE_V_FRONT_PORCH + HSTX_MODE_V_SYNC_WIDTH + \
      HSTX_MODE_V_BACK_PORCH + HSTX_MODE_V_ACTIVE_LINES)
 
@@ -57,17 +57,17 @@
 // -----------------------------------------------------------------------------
 // HSTX commands
 
-#define HSTX_CMD_RAW         (0x0u << 12)
-#define HSTX_CMD_RAW_REPEAT  (0x1u << 12)
-#define HSTX_CMD_TMDS        (0x2u << 12)
+#define HSTX_CMD_RAW (0x0u << 12)
+#define HSTX_CMD_RAW_REPEAT (0x1u << 12)
+#define HSTX_CMD_TMDS (0x2u << 12)
 #define HSTX_CMD_TMDS_REPEAT (0x3u << 12)
-#define HSTX_CMD_NOP         (0xfu << 12)
+#define HSTX_CMD_NOP (0xfu << 12)
 
 // -----------------------------------------------------------------------------
 // DMA channels
 //
-// 0 and 1 are used by the official example. Before finalizing, we will confirm
-// that no other subsystem uses these channels.
+// HSTX表示は公式サンプルと同じDMAチャネル0/1を使用する。
+// RP2350版IR.INのPIO DMAはチャネル10を使用し、HSTXとは競合させない。
 #define HSTX_DMACH_PING 0
 #define HSTX_DMACH_PONG 1
 
@@ -76,9 +76,7 @@
 //
 // 640 x 480 x 1 byte = 307,200 bytes
 
-static uint8_t hstx_framebuf[
-    HSTX_MODE_H_ACTIVE_PIXELS * HSTX_MODE_V_ACTIVE_LINES
-];
+static uint8_t hstx_framebuf[HSTX_MODE_H_ACTIVE_PIXELS * HSTX_MODE_V_ACTIVE_LINES];
 
 static uint32_t hstx_vblank_line_vsync_off[] = {
     HSTX_CMD_RAW_REPEAT | HSTX_MODE_H_FRONT_PORCH,
@@ -88,8 +86,7 @@ static uint32_t hstx_vblank_line_vsync_off[] = {
     HSTX_CMD_RAW_REPEAT |
         (HSTX_MODE_H_BACK_PORCH + HSTX_MODE_H_ACTIVE_PIXELS),
     HSTX_SYNC_V1_H1,
-    HSTX_CMD_NOP
-};
+    HSTX_CMD_NOP};
 
 static uint32_t hstx_vblank_line_vsync_on[] = {
     HSTX_CMD_RAW_REPEAT | HSTX_MODE_H_FRONT_PORCH,
@@ -99,8 +96,7 @@ static uint32_t hstx_vblank_line_vsync_on[] = {
     HSTX_CMD_RAW_REPEAT |
         (HSTX_MODE_H_BACK_PORCH + HSTX_MODE_H_ACTIVE_PIXELS),
     HSTX_SYNC_V0_H1,
-    HSTX_CMD_NOP
-};
+    HSTX_CMD_NOP};
 
 static uint32_t hstx_vactive_line[] = {
     HSTX_CMD_RAW_REPEAT | HSTX_MODE_H_FRONT_PORCH,
@@ -111,8 +107,7 @@ static uint32_t hstx_vactive_line[] = {
     HSTX_CMD_NOP,
     HSTX_CMD_RAW_REPEAT | HSTX_MODE_H_BACK_PORCH,
     HSTX_SYNC_V1_H1,
-    HSTX_CMD_TMDS | HSTX_MODE_H_ACTIVE_PIXELS
-};
+    HSTX_CMD_TMDS | HSTX_MODE_H_ACTIVE_PIXELS};
 
 static volatile bool hstx_dma_pong = false;
 static volatile uint hstx_v_scanline = 2;
@@ -125,7 +120,8 @@ static volatile bool hstx_core1_ready = false;
 // -----------------------------------------------------------------------------
 // RGB332 helper
 
-static inline uint8_t hstx_colour_rgb332(uint8_t r, uint8_t g, uint8_t b) {
+static inline uint8_t hstx_colour_rgb332(uint8_t r, uint8_t g, uint8_t b)
+{
     return ((r & 0xc0u) >> 6) |
            ((g & 0xe0u) >> 3) |
            ((b & 0xe0u) >> 0);
@@ -134,7 +130,8 @@ static inline uint8_t hstx_colour_rgb332(uint8_t r, uint8_t g, uint8_t b) {
 // -----------------------------------------------------------------------------
 // DMA interrupt
 
-void __scratch_x("") hstx_dma_irq_handler(void) {
+void __scratch_x("") hstx_dma_irq_handler(void)
+{
     uint ch_num = hstx_dma_pong ? HSTX_DMACH_PONG : HSTX_DMACH_PING;
     dma_channel_hw_t *ch = &dma_hw->ch[ch_num];
 
@@ -143,34 +140,36 @@ void __scratch_x("") hstx_dma_irq_handler(void) {
 
     if (hstx_v_scanline >= HSTX_MODE_V_FRONT_PORCH &&
         hstx_v_scanline <
-        HSTX_MODE_V_FRONT_PORCH + HSTX_MODE_V_SYNC_WIDTH) {
+            HSTX_MODE_V_FRONT_PORCH + HSTX_MODE_V_SYNC_WIDTH)
+    {
 
         ch->read_addr = (uintptr_t)hstx_vblank_line_vsync_on;
         ch->transfer_count = count_of(hstx_vblank_line_vsync_on);
-
-    } else if (hstx_v_scanline <
-               HSTX_MODE_V_FRONT_PORCH +
-               HSTX_MODE_V_SYNC_WIDTH +
-               HSTX_MODE_V_BACK_PORCH) {
+    }
+    else if (hstx_v_scanline <
+             HSTX_MODE_V_FRONT_PORCH +
+                 HSTX_MODE_V_SYNC_WIDTH +
+                 HSTX_MODE_V_BACK_PORCH)
+    {
 
         ch->read_addr = (uintptr_t)hstx_vblank_line_vsync_off;
         ch->transfer_count = count_of(hstx_vblank_line_vsync_off);
-
-    } else if (!hstx_vactive_cmdlist_posted) {
+    }
+    else if (!hstx_vactive_cmdlist_posted)
+    {
 
         ch->read_addr = (uintptr_t)hstx_vactive_line;
         ch->transfer_count = count_of(hstx_vactive_line);
         hstx_vactive_cmdlist_posted = true;
-
-    } else {
+    }
+    else
+    {
         uint active_line =
             hstx_v_scanline -
             (HSTX_MODE_V_TOTAL_LINES - HSTX_MODE_V_ACTIVE_LINES);
 
         ch->read_addr =
-            (uintptr_t)&hstx_framebuf[
-                active_line * HSTX_MODE_H_ACTIVE_PIXELS
-            ];
+            (uintptr_t)&hstx_framebuf[active_line * HSTX_MODE_H_ACTIVE_PIXELS];
 
         ch->transfer_count =
             HSTX_MODE_H_ACTIVE_PIXELS / sizeof(uint32_t);
@@ -178,11 +177,13 @@ void __scratch_x("") hstx_dma_irq_handler(void) {
         hstx_vactive_cmdlist_posted = false;
     }
 
-    if (!hstx_vactive_cmdlist_posted) {
+    if (!hstx_vactive_cmdlist_posted)
+    {
         hstx_v_scanline =
             (hstx_v_scanline + 1) % HSTX_MODE_V_TOTAL_LINES;
 
-        if (hstx_v_scanline == 0) {
+        if (hstx_v_scanline == 0)
+        {
             hstx_frame_count++;
         }
     }
@@ -191,18 +192,20 @@ void __scratch_x("") hstx_dma_irq_handler(void) {
 // -----------------------------------------------------------------------------
 // HSTX initialization
 
-void hstx_video_init(void) {
-    if (hstx_started) {
+void hstx_video_init(void)
+{
+    if (hstx_started)
+    {
         return;
     }
 
     // HSTX TMDS encoder: RGB332
     hstx_ctrl_hw->expand_tmds =
-        2  << HSTX_CTRL_EXPAND_TMDS_L2_NBITS_LSB |
-        0  << HSTX_CTRL_EXPAND_TMDS_L2_ROT_LSB   |
-        2  << HSTX_CTRL_EXPAND_TMDS_L1_NBITS_LSB |
-        29 << HSTX_CTRL_EXPAND_TMDS_L1_ROT_LSB   |
-        1  << HSTX_CTRL_EXPAND_TMDS_L0_NBITS_LSB |
+        2 << HSTX_CTRL_EXPAND_TMDS_L2_NBITS_LSB |
+        0 << HSTX_CTRL_EXPAND_TMDS_L2_ROT_LSB |
+        2 << HSTX_CTRL_EXPAND_TMDS_L1_NBITS_LSB |
+        29 << HSTX_CTRL_EXPAND_TMDS_L1_ROT_LSB |
+        1 << HSTX_CTRL_EXPAND_TMDS_L0_NBITS_LSB |
         26 << HSTX_CTRL_EXPAND_TMDS_L0_ROT_LSB;
 
     hstx_ctrl_hw->expand_shift =
@@ -231,7 +234,8 @@ void hstx_video_init(void) {
     hstx_ctrl_hw->bit[3] =
         HSTX_CTRL_BIT0_CLK_BITS | HSTX_CTRL_BIT0_INV_BITS;
 
-    for (uint lane = 0; lane < 3; ++lane) {
+    for (uint lane = 0; lane < 3; ++lane)
+    {
         static const int lane_to_output_bit[3] = {0, 6, 4};
 
         int bit = lane_to_output_bit[lane];
@@ -245,7 +249,8 @@ void hstx_video_init(void) {
             lane_data_sel_bits | HSTX_CTRL_BIT0_INV_BITS;
     }
 
-    for (int i = 12; i <= 19; ++i) {
+    for (int i = 12; i <= 19; ++i)
+    {
         gpio_set_function(i, GPIO_FUNC_HSTX);
     }
 
@@ -261,8 +266,7 @@ void hstx_video_init(void) {
         &hstx_fifo_hw->fifo,
         hstx_vblank_line_vsync_off,
         count_of(hstx_vblank_line_vsync_off),
-        false
-    );
+        false);
 
     c = dma_channel_get_default_config(HSTX_DMACH_PONG);
     channel_config_set_chain_to(&c, HSTX_DMACH_PING);
@@ -274,8 +278,7 @@ void hstx_video_init(void) {
         &hstx_fifo_hw->fifo,
         hstx_vblank_line_vsync_off,
         count_of(hstx_vblank_line_vsync_off),
-        false
-    );
+        false);
 
     dma_channel_acknowledge_irq1(HSTX_DMACH_PING);
     dma_channel_acknowledge_irq1(HSTX_DMACH_PONG);
@@ -302,8 +305,10 @@ void hstx_video_init(void) {
     hstx_started = true;
 }
 
-void hstx_video_stop(void) {
-    if (!hstx_started) {
+void hstx_video_stop(void)
+{
+    if (!hstx_started)
+    {
         return;
     }
 
@@ -332,45 +337,53 @@ void hstx_video_stop(void) {
     hstx_started = false;
 }
 
-
-int hstx_video_active(void) {
+int hstx_video_active(void)
+{
     return hstx_started;
 }
 
-void hstx_video_wait_sync(uint num) {
+void hstx_video_wait_sync(uint num)
+{
     uint32_t start = hstx_frame_count;
 
-    while ((uint32_t)(hstx_frame_count - start) < num) {
+    while ((uint32_t)(hstx_frame_count - start) < num)
+    {
         tight_loop_contents();
     }
 }
 
-void hstx_video_fill(uint8_t colour) {
+void hstx_video_fill(uint8_t colour)
+{
     memset(
         hstx_framebuf,
         colour,
-        sizeof(hstx_framebuf)
-    );
+        sizeof(hstx_framebuf));
 }
 
 void hstx_core1_main(void);
 
-void hstx_video_test_pattern(void) {
-    for (uint y = 0; y < HSTX_MODE_V_ACTIVE_LINES; ++y) {
-        for (uint x = 0; x < HSTX_MODE_H_ACTIVE_PIXELS; ++x) {
+void hstx_video_test_pattern(void)
+{
+    for (uint y = 0; y < HSTX_MODE_V_ACTIVE_LINES; ++y)
+    {
+        for (uint x = 0; x < HSTX_MODE_H_ACTIVE_PIXELS; ++x)
+        {
             uint8_t colour;
 
-            if (x < 213) {
+            if (x < 213)
+            {
                 colour = hstx_colour_rgb332(255, 0, 0);
-            } else if (x < 426) {
+            }
+            else if (x < 426)
+            {
                 colour = hstx_colour_rgb332(0, 255, 0);
-            } else {
+            }
+            else
+            {
                 colour = hstx_colour_rgb332(0, 0, 255);
             }
 
-            hstx_framebuf[
-                y * HSTX_MODE_H_ACTIVE_PIXELS + x
-            ] = colour;
+            hstx_framebuf[y * HSTX_MODE_H_ACTIVE_PIXELS + x] = colour;
         }
     }
 }
@@ -383,7 +396,8 @@ void hstx_video_test_pattern(void) {
 //   0: core 1再起動、HSTX初期化、フレーム進行まで成功
 //   1: core 1再起動または hstx_core1_main() 到達に失敗
 //   2: core 1は起動したが、HSTX DMA IRQが進まず frame_count が増えない
-int hstx_core1_reboot(void) {
+int hstx_core1_reboot(void)
+{
     // core 1を止める。HSTX DMA IRQもcore 1側で動いているため、
     // ここでcore 1側のIRQ処理を完全に止める。
     multicore_reset_core1();
@@ -421,38 +435,45 @@ int hstx_core1_reboot(void) {
     multicore_launch_core1(hstx_core1_main);
 
     // core 1が hstx_core1_main() に入り、HSTX初期化を終えるまで待つ
-    for (uint32_t i = 0; i < 1000000; i++) {
-        if (hstx_core1_ready) {
+    for (uint32_t i = 0; i < 1000000; i++)
+    {
+        if (hstx_core1_ready)
+        {
             break;
         }
         tight_loop_contents();
     }
 
-    if (!hstx_core1_ready) {
-        return 1;   // core 1再起動失敗
+    if (!hstx_core1_ready)
+    {
+        return 1; // core 1再起動失敗
     }
 
-    // HSTX DMA IRQが再開し、フレームが進むか確認する
-    for (uint32_t i = 0; i < 3000000; i++) {
-        if (hstx_frame_count >= 2) {
-            return 0;   // core 1再起動 + HSTX走査再開 OK
+    // HSTX DMA IRQが再開し、フレームが進むまで待つ
+    for (uint32_t i = 0; i < 3000000; i++)
+    {
+        if (hstx_frame_count >= 2)
+        {
+            return 0; // core 1再起動 + HSTX走査再開 OK
         }
         tight_loop_contents();
     }
 
-    return 2;   // core 1は起動したが、HSTXフレームが進まない
+    return 2; // core 1は起動したが、HSTXフレームが進まない
 }
 
 // -----------------------------------------------------------------------------
 // Core 1: HSTX DMA / DMA IRQ専用
 
-void hstx_core1_main(void) {
+void hstx_core1_main(void)
+{
     flash_safe_execute_core_init();
 
     hstx_video_init();
     hstx_core1_ready = true;
 
-    while (true) {
+    while (true)
+    {
         __wfi();
     }
 }
@@ -460,4 +481,3 @@ void hstx_core1_main(void) {
 #endif // PICO_RP2350
 
 #endif // __DISPLAY_PICO2_HSTX_H__
-
