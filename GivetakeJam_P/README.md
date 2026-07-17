@@ -108,6 +108,39 @@ IR.IN port,[n]
 - For stable operation, error filtering and repeat filtering are recommended
 - The timing-critical decode section is protected after leader detection
 
+## Raspberry Pi Pico 2 / RP2350 Support
+
+The Raspberry Pi Pico 2 / RP2350 build supports HSTX DVI video output.
+
+Confirmed features on Pico 2:
+
+- HSTX DVI video output
+- USB keyboard input
+- `BEEP` / `PLAY` sound output on GPIO20
+- `VIDEO 0` / `VIDEO 1` display control
+  - `VIDEO 0` clears the screen and stops screen updates
+  - the HSTX DVI signal itself continues running
+  - `VIDEO 1` resumes screen updates
+- `IR.IN` using RP2350 PIO + DMA
+  - confirmed on IN1 to IN4
+  - result array: `[0]` to `[6]`
+  - IR DMA uses channel 10
+- Internal flash `SAVE` / `LOAD` / `FILES`
+- External I2C EEPROM slots `100` to `131`
+- `LRUN` from external EEPROM
+
+### Pico 2 IR.IN Example
+
+```basic
+10 CLS
+20 IR.IN 4,[0]:IF [5]<>0 CONT
+30 A=[2] & #FF
+40 ?HEX$(A,2)
+```
+
+For the Pico 2 HSTX DVI build, HSTX video uses DMA channels 0 and 1.  
+The RP2350 `IR.IN` PIO DMA implementation uses DMA channel 10, so it does not conflict with HSTX video DMA.
+
 ## ENV.IN Command
 
 `ENV.IN` reads temperature and humidity from AHT20 and pressure from BMP280 over I2C.
@@ -233,6 +266,14 @@ Then build as usual. When `IchigoJam_P.uf2` is generated, write it to the Pico.
 - `SHA-256`: `8C5F00629A0658B1B815B549B754F257A34DDB45CAFC131F4E4AB596C037569B`
 - `MD5`: `327331C46DDF7C06408C4E95AA98D395`
 - `SHA-1`: `C8544B114B293DBF27BD3738DC0F289F317FA6C4`
+
+## Raspberry Pi Pico 2 / RP2350 Firmware / Checksum
+
+- `GivetakeJam_P.uf2`
+- Write this firmware to Raspberry Pi Pico 2 / RP2350.
+- `SHA-256`: `2132dfc2615719bedc0eb640afd8ba91650de1e127638280d8707b1a415e3a02`
+- `MD5`: `d5a75fd249f1d777b68b8e2b597fe458`
+- `SHA-1`: `2a72819e1883284f1fd07288de2e2f054260567a`
 
 ## Test Programs
 

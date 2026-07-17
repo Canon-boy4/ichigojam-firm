@@ -58,13 +58,46 @@
     - [n+6] = モード
       - 0 = NEC 標準
       - 1 = NEC 拡張
-  - 使用例 プログラム IR_IN_TEST.BAS
-  - 使用例 表示結果 807F01FE
+  - 使用例
+    ```basic
+    10 CLS
+    20 IR.IN 4,[0]:IF [5]<>0 CONT
+    30 A=[2] & #FF
+    40 ?HEX$(A,2)
+    ```
+  - 表示結果は使用するリモコンのボタンにより変わります。
   - 注意
     - HX1838の出力は待機時 HIGH を前提としています
     - 38kHz搬送波は受光モジュール側で復調済みです
     - 安定動作のため、エラー除外と repeat除外を推奨します
     - リーダーコード検出後の NECデコード区間では、安定化のため割り込みの影響を抑えています
+
+- Raspberry Pi Pico 2 / RP2350 対応
+  - Pico 2 / RP2350 ビルドでは、HSTX DVI表示に対応しています。
+  - Pico 2で確認済みの機能
+    - HSTX DVI表示
+    - USBキーボード入力
+    - GPIO20での`BEEP` / `PLAY`音声出力
+    - `VIDEO 0` / `VIDEO 1`表示制御
+      - `VIDEO 0`で画面を消し、画面更新を停止します
+      - HSTX DVI信号自体は出力を継続します
+      - `VIDEO 1`で画面更新を再開します
+    - RP2350 PIO + DMAによる`IR.IN`
+      - IN1〜IN4で確認済み
+      - 結果配列は`[0]`〜`[6]`
+      - IR用DMAはチャネル10を使用
+    - 内蔵フラッシュの`SAVE` / `LOAD` / `FILES`
+    - 外部I2C EEPROMのスロット`100`〜`131`
+    - 外部EEPROMからの`LRUN`
+  - `IR.IN`使用例
+    ```basic
+    10 CLS
+    20 IR.IN 4,[0]:IF [5]<>0 CONT
+    30 A=[2] & #FF
+    40 ?HEX$(A,2)
+    ```
+  - Pico 2 HSTX DVIビルドでは、HSTX表示にDMAチャネル0/1を使用します。
+  - RP2350版`IR.IN`のPIO DMAはDMAチャネル10を使用するため、HSTX表示用DMAとは競合しません。
 
 - AHT20とBMP280モジュールを使って温湿度と気圧を測定するコマンド ENV.IN を追加
   - 書式
@@ -144,13 +177,21 @@ make
     - "IchigoJam_BASIC": basic.h , ram.h , tokens_v1.5.h
     - "src": config.h , i2ceeprom.h , storage.h , io.h
     - IchigoJam P の時の様にビルドして、`IchigoJam_P.uf2`ファイルが作成できたらpicoに書き込みます。
-    - IchigoJam_P.uf2: 4K版のファームウェアファイルです。
+    - IchigoJam_P.uf2: Raspberry Pi Pico / RP2040用の4K版ファームウェアファイルです。
     - チェックサム
-      SHA-256: 61860e5e6818e80bd31dc70909b0e5b500e3cb495ddb19fb6f2698dc40066e32
-      MD5: 2ffb09348083811a0f3c3518ba52da45
-      SHA-1: 2d34932ca879a46af408d8daa54a3b9b6a9114cf
+      SHA-256: 8C5F00629A0658B1B815B549B754F257A34DDB45CAFC131F4E4AB596C037569B
+      MD5: 327331C46DDF7C06408C4E95AA98D395
+      SHA-1: C8544B114B293DBF27BD3738DC0F289F317FA6C4
     
     - ARRAY_VAR_TOTAL_TEST.BAS: 配列変数のテストプログラムです。このテストが ALL OK で通ることを確認しています。
+
+## Raspberry Pi Pico 2 / RP2350 4K版ファームウェア
+
+- `GivetakeJam_P.uf2`: Raspberry Pi Pico 2 / RP2350用の4K版ファームウェアファイルです。
+- チェックサム
+  - SHA-256: `2132dfc2615719bedc0eb640afd8ba91650de1e127638280d8707b1a415e3a02`
+  - MD5: `d5a75fd249f1d777b68b8e2b597fe458`
+  - SHA-1: `2a72819e1883284f1fd07288de2e2f054260567a`
 
 ## Screenshot
 
