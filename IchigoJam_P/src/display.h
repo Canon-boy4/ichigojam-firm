@@ -11,24 +11,41 @@
 // -----------------------------------------------------------------------------
 // Raspberry Pi Pico 2 / RP2350 / HSTX DVI
 
-void video_on() {
+// VIDEO 0 はHSTX/DVI信号を止めるためではなく、
+// VRAMからHSTXフレームバッファへの画面更新を止め、
+// BASIC実行速度を上げるために使う。
+// HSTX信号自体はcore1側で出し続ける。
+static volatile uint8_t hstx_screen_active = 1;
+
+void video_on()
+{
     SCREEN_W = CHAR_MAX_COLS >> _g.screen_big;
     SCREEN_H = CHAR_MAX_ROWS >> _g.screen_big;
 
-    // HSTX開始は pico_init() 側で一度だけhstx_video_init()を行う。;
+    // VIDEO 1/2/3/4 で画面更新を再開する。
+    // HSTX開始は pico_init() 側で一度だけ行う。
+    hstx_screen_active = 1;
 }
 
-void video_off(int clkdiv) {
+void video_off(int clkdiv)
+{
     (void)clkdiv;
-    // まだ停止処理hstx_video_stop()を呼ばない。;
+
+    // VIDEO 0 ではHSTX/DVI信号は止めない。
+    // 互換性のため、まず画面を黒で消してから、
+    // timer() からの画面更新を止める。
+    hstx_video_fill(0x00);
+    hstx_screen_active = 0;
 }
 
-inline int video_active() {
-    return hstx_video_active();
+static inline int video_active()
+{
+    return hstx_screen_active;
 }
 
-void video_waitSync(uint num) {
-    // まだ hstx_video_wait_sync(num)を呼ばない。;
+void video_waitSync(uint num)
+{
+    // 現状は何もしない。
     (void)num;
 }
 
@@ -39,7 +56,8 @@ void video_waitSync(uint num) {
 
 struct dvi_inst dvi0;
 
-void video_on() {
+void video_on()
+{
     SCREEN_W = CHAR_MAX_COLS >> _g.screen_big;
     SCREEN_H = CHAR_MAX_ROWS >> _g.screen_big;
 
@@ -47,26 +65,29 @@ void video_on() {
 }
 
 // クロックの変更機能はつけない
-void video_off(int clkdiv) {
+void video_off(int clkdiv)
+{
     (void)clkdiv;
     dvi_stop(&dvi0);
 }
 
-inline int video_active() {
+static inline int video_active()
+{
     return dvi0.started;
 }
 
-void video_waitSync(uint num) {
+void video_waitSync(uint num)
+{
     // 現状は何もしない
     (void)num;
 }
 
 #endif // PICO_RP2350
 
-INLINE void IJB_lcd(uint mode) {
+INLINE void IJB_lcd(uint mode)
+{
     // SWITCHで呼ばれる。LCD機能は未実装。
     (void)mode;
 }
 
 #endif // __DISPLAY_H__
-
