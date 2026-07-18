@@ -1,16 +1,20 @@
 # GivetakeJam BASIC
+
 ![Platform](https://img.shields.io/badge/platform-Raspberry%20Pi%20Pico-blue)
 ![Language](https://img.shields.io/badge/language-BASIC-orange)
 ![License](https://img.shields.io/badge/license-IchigoJam-green)
-![Version](https://img.shields.io/badge/version-v1.6.1-brightgreen)
+![Version](https://img.shields.io/badge/version-16120-brightgreen)
 ![Status](https://img.shields.io/badge/status-stable-success)
 
-##  プログラム容量の拡張、配列変数の拡張、外部EEPROM対応の改善、NEC方式の赤外線受信コマンド、環境測定コマンドの追加を行い、従来のIchigoJam P BASICの互換性を維持しながら機能強化しています。
+## プログラム容量の拡張、配列変数の拡張、外部EEPROM対応の改善、NEC方式の赤外線受信コマンド、環境測定コマンドの追加を行い、従来のIchigoJam P BASICの互換性を維持しながら機能強化しています。
 
 ## 機能 / 変更点
+
 - プログラム容量を 1024 → 4096バイト に拡張
 
-- 内部保存プログラム本数を 100 → 25 に変更
+- 内部保存プログラム本数
+  - Raspberry Pi Pico / RP2040版: 25本
+  - Raspberry Pi Pico 2 / RP2350版: 100本
 
 - 配列変数を拡張：
   - オリジナル：[0] ～ [101]
@@ -46,6 +50,7 @@
   - 書式
     ```sh
       IR.IN port,[n]
+    ```
   - 説明
     - 指定した入力ポートから NEC形式の赤外線信号を受信し、デコード結果を [n] から始まる配列変数に格納します。
   - 結果の格納先
@@ -103,6 +108,7 @@
   - 書式
     ```sh
       ENV.IN [n]
+    ```
   - 説明
     - I2CラインにつないだAHT20とBMP280から 測定データを受信し、デコード結果を [n] から始まる配列変数に格納します。
   - 結果の格納先
@@ -122,58 +128,78 @@
       - bit1 = BMP280 正常
   - 使用例 プログラム ENV_IN_TEST.BAS
 
-- 拡張版識別のため VER() を 16114 に変更
-  - 使用例 BASIC
-    ```sh 
-     ? VER()
-     16114
-    ```
+- 拡張版識別のため `VER()` を変更
+  - Raspberry Pi Pico / RP2040版: `16114`
+  - Raspberry Pi Pico 2 / RP2350版: `16120`
 
+  使用例 BASIC
+
+  Raspberry Pi Pico / RP2040版:
+  ```sh
+  ? VER()
+  16114
+  ? VER(1)
+  8
+  ```
+
+  Raspberry Pi Pico 2 / RP2350版:
+  ```sh
+  ? VER()
+  16120
+  ? VER(1)
+  9
+  ```
+
+- `VER(1)` によるプラットフォーム識別
+  - Raspberry Pi Pico / RP2040版: `8`
+  - Raspberry Pi Pico 2 / RP2350版: `9`
 ---
 
 #  IchigoJam P BASICのソースコードを変更して４K版にしたものです。よって、まずはIchigoJam P BASICがコンパイルできる環境を作成します。
 
 ## 環境構築
-- "CMake"と"GCC"をインストールする  
+- "CMake"と"GCC"をインストールする
 
-## IchigoJam_P のコンパイル環境 
+## IchigoJam_P のコンパイル環境
 　　-  IchigoJam_P のディレクトリーで作成します。
 
-- 以下のライブラリを`IchigoJam_P`ディレクトリ直下に置く  
-    - "IchigoJam_BASIC": 1つ上の階層にある`IchigoJam_BASIC`ディレクトリをコピーする  
-    - "pico-sdk": https://github.com/NaturalStyle/pico-sdk.git `196662b`のコミットを使用(別のコミットを使用すると正しく動作しない)  
-    - "pico-extras": https://github.com/raspberrypi/pico-extras.git 開発時は`09c64d5`のコミットを使用  
-    - "PicoDVI": https://github.com/mlorenzati/PicoDVI.git `579eecc`のコミットを使用(別のコミットを使用すると正しく動作しない)  
+- 以下のライブラリを`IchigoJam_P`ディレクトリ直下に置く
+    - "IchigoJam_BASIC": 1つ上の階層にある`IchigoJam_BASIC`ディレクトリをコピーする
+    - "pico-sdk": https://github.com/NaturalStyle/pico-sdk.git `196662b`のコミットを使用(別のコミットを使用すると正しく動作しない)
+    - "pico-extras": https://github.com/raspberrypi/pico-extras.git 開発時は`09c64d5`のコミットを使用
+    - "PicoDVI": https://github.com/mlorenzati/PicoDVI.git `579eecc`のコミットを使用(別のコミットを使用すると正しく動作しない)
 
-- 以下のパスを通す  
+- 以下のパスを通す
     ```sh
-    PICO_SDK_PATH=foo/IchigoJam_P/pico-sdk  
-    PICO_EXTRAS_PATH=foo/IchigoJam_P/pico-extras  
+    PICO_SDK_PATH=foo/IchigoJam_P/pico-sdk
+    PICO_EXTRAS_PATH=foo/IchigoJam_P/pico-extras
     ```
 
-詳細は以下を参照  
-[Raspberry Pi Picoをセットアップしよう](https://datasheets.raspberrypi.com/pico/getting-started-with-pico-JP.pdf)  
+詳細は以下を参照
+[Raspberry Pi Picoをセットアップしよう](https://datasheets.raspberrypi.com/pico/getting-started-with-pico-JP.pdf)
 
 ## ビルド
 ```sh
-cd IchigoJam_P  
-mkdir build  
-cd build  
-cmake ..  
-make  
+cd IchigoJam_P
+mkdir build
+cd build
+cmake ..
+make
 ```
 
-`IchigoJam_P.uf2`ファイルが作成できたらpicoに書き込む  
+`IchigoJam_P.uf2`ファイルが作成できたらpicoに書き込む
 
 ## 動作がおかしくなったら
+
 `build`ディレクトリを消して作り直してみる  
-特に映像の出力が正常に行われなくなることが多い  
+特に映像の出力が正常に行われなくなることが多い
 
 ## TODO
-高解像度に対応する(TVでも使えるようにするため)  
 
+高解像度に対応する(TVでも使えるようにするため)
 
 ## ４K版にするために GivetakeJam_P のディレクトリーにある以下のファイルを IchigoJam_P の各のディレクトリーに上書きコピーします。
+
     - "IchigoJam_BASIC": basic.h , ram.h , tokens_v1.5.h
     - "src": config.h , i2ceeprom.h , storage.h , io.h
     - IchigoJam P の時の様にビルドして、`IchigoJam_P.uf2`ファイルが作成できたらpicoに書き込みます。
@@ -182,50 +208,60 @@ make
       SHA-256: 8C5F00629A0658B1B815B549B754F257A34DDB45CAFC131F4E4AB596C037569B
       MD5: 327331C46DDF7C06408C4E95AA98D395
       SHA-1: C8544B114B293DBF27BD3738DC0F289F317FA6C4
-    
+
     - ARRAY_VAR_TOTAL_TEST.BAS: 配列変数のテストプログラムです。このテストが ALL OK で通ることを確認しています。
 
 ## Raspberry Pi Pico 2 / RP2350 4K版ファームウェア
 
 - `GivetakeJam_P.uf2`: Raspberry Pi Pico 2 / RP2350用の4K版ファームウェアファイルです。
 - チェックサム
-  - SHA-256: `2132dfc2615719bedc0eb640afd8ba91650de1e127638280d8707b1a415e3a02`
-  - MD5: `d5a75fd249f1d777b68b8e2b597fe458`
-  - SHA-1: `2a72819e1883284f1fd07288de2e2f054260567a`
+  - SHA-256: `7F620F48A46A73C7527B8BB1672E14B0AB25BDD745C528423F1127F7326B2D11`
+  - MD5: `51C583CCD7E7AA52585D2CC9403789E6`
+  - SHA-1: `6FE9B8AD4C843ACA8865DD6637ACEB26B925127A`
 
 ## Screenshot
 
 ### 動作環境
+
 ![screenshot](./docs/IMG_2095up.png)
 
 ### 表示画面 ( 名称, HELP表示：メモリマップ, FILES表示 )
+
 ![screenshot](./docs/IMG_2159up.png)
 
 ### IchigoJam_P 互換基板 ( MECHTARIAT PJ 凸 )
+
 ![screenshot](./docs/IMG_2168up.png)
 
 ## ライセンス / license
+
     - Copyright 2014-2025 the IchigoJam authors. All rights reserved. MIT license.  https://ichigojam.net/license
 
 ## 商標 / Trademark
-    - IchigoJamは、株式会社jig.jpの登録商標です。(IchigoJam is a registered trademark of jig.jp co., ltd.) 
-    - Raspberry Pi は、Raspberry Pi財団の登録商標です。(Raspberry Pi is a registered trademark of the Raspberry Pi Foundation)  
+
+    - IchigoJamは、株式会社jig.jpの登録商標です。(IchigoJam is a registered trademark of jig.jp co., ltd.)
+    - Raspberry Pi は、Raspberry Pi財団の登録商標です。(Raspberry Pi is a registered trademark of the Raspberry Pi Foundation)
 
 ## 利用規約に同意の上、ダウンロードしてください。第三者への配布にはライセンスが必要になります。詳しくはこちら。https://pcn.club/sp/ijp/
+
     - 利用規約（IchigoJamロイヤリティフリープログラム利用規約） https://ichigojam.net/ichigojam-license.pdf
 
 ## 既知の制限 / 注意事項
+
 - プログラム最大 4096 バイト
-- 内部保存プログラム本数は 25本
+- 内部保存プログラム本数
+  - Raspberry Pi Pico / RP2040版: 25本
+  - Raspberry Pi Pico 2 / RP2350版: 100本
 - 外部EEPROM表示は 100～131固定
   - 24LC64 追加本数 2本
   - 24LC256 追加本数 8本
-  - 24FC1025 追加本数 32本 
+  - 24FC1025 追加本数 32本
 - 実際の使用可能プログラム本数はEEPROM容量依存
 - EEPROM検出はI2C アドレス 0x50 の応答で判定
 - IR受信を安定させるため、BASIC側で repeat 除外を推奨します
 
 ギブテクウインウイン
-2026/5/29 作成  
+2026/5/29 作成
+2026/7/18 Pico 2 / RP2350 HSTX DVI版を追加
 ![Release](https://img.shields.io/github/v/release/IchigoJam/ichigojam-firm)
 ![Downloads](https://img.shields.io/github/downloads/IchigoJam/ichigojam-firm/total)

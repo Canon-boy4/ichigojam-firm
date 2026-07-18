@@ -3,7 +3,7 @@
 ![Platform](https://img.shields.io/badge/platform-Raspberry%20Pi%20Pico-blue)
 ![Language](https://img.shields.io/badge/language-BASIC-orange)
 ![License](https://img.shields.io/badge/license-IchigoJam-green)
-![Version](https://img.shields.io/badge/version-16114-brightgreen)
+![Version](https://img.shields.io/badge/version-16120-brightgreen)
 ![Status](https://img.shields.io/badge/status-stable-success)
 
 Extended IchigoJam BASIC for Raspberry Pi Pico with a 4096-byte program area, expanded arrays, improved external EEPROM support, NEC infrared reception, and environmental sensing.
@@ -12,14 +12,16 @@ Extended IchigoJam BASIC for Raspberry Pi Pico with a 4096-byte program area, ex
 
 - Full compatibility with IchigoJam BASIC 1.6.1 commands
 - Program size expanded from 1024 bytes to 4096 bytes
-- Internal storage reduced from 100 slots to 25 slots
+- Internal flash storage slots
+  - Raspberry Pi Pico / RP2040: 25 slots
+  - Raspberry Pi Pico 2 / RP2350: 100 slots
 - Array variables expanded from `[0]..[101]` to `[0]..[357]`
 - Added `VAR2` area at `#C00`
 - LIST area moved to `#E00`
 - Improved external EEPROM handling
 - Added `IR.IN` command for NEC infrared reception
 - Added `ENV.IN` command for AHT20 + BMP280 environment sensing
-- `VER()` updated to `16114`
+- `VER()` returns `16120` on Raspberry Pi Pico 2 / RP2350
 
 ## Memory Map
 
@@ -57,7 +59,11 @@ Extended IchigoJam BASIC for Raspberry Pi Pico with a 4096-byte program area, ex
 - Added `IR.IN` command for HX1838-compatible NEC infrared receiver modules
 - Added `ENV.IN` command for AHT20 + BMP280 environment sensing
 - Built-in `HELP` memory map updated
-- `VER()` updated to `16114`
+- `VER()` returns `16114` on Raspberry Pi Pico / RP2040
+- `VER()` returns `16120` on Raspberry Pi Pico 2 / RP2350
+- Platform identification by `VER(1)`
+  - Raspberry Pi Pico / RP2040: `8`
+  - Raspberry Pi Pico 2 / RP2350: `9`
 
 ## IR.IN Command
 
@@ -271,9 +277,9 @@ Then build as usual. When `IchigoJam_P.uf2` is generated, write it to the Pico.
 
 - `GivetakeJam_P.uf2`
 - Write this firmware to Raspberry Pi Pico 2 / RP2350.
-- `SHA-256`: `2132dfc2615719bedc0eb640afd8ba91650de1e127638280d8707b1a415e3a02`
-- `MD5`: `d5a75fd249f1d777b68b8e2b597fe458`
-- `SHA-1`: `2a72819e1883284f1fd07288de2e2f054260567a`
+- `SHA-256`: `7F620F48A46A73C7527B8BB1672E14B0AB25BDD745C528423F1127F7326B2D11`
+- `MD5`: `51C583CCD7E7AA52585D2CC9403789E6`
+- `SHA-1`: `6FE9B8AD4C843ACA8865DD6637ACEB26B925127A`
 
 ## Test Programs
 
@@ -335,3 +341,4 @@ A license is required for redistribution to third parties.
 
 Givetakewinwin  
 Created: 2026-05-29
+Updated on 2026-07-18 for Raspberry Pi Pico 2 / RP2350 HSTX DVI support.

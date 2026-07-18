@@ -1670,7 +1670,11 @@ static int16 token_expression5()
 	{
 		int n = token_opt1();
 		if (n == 0)
-			return IJB_VER * 100 + IJB_BUILD + 15; // VER() 16110 -> 16114 ENV.IN 追加で+4、PWM6,8,9,10,11追加で+5とする
+#ifdef PICO_RP2350
+			return IJB_VER * 100 + IJB_BUILD + 20; // Pico 2 / RP2350版識別用: VER() = 16120
+#else
+			return IJB_VER * 100 + IJB_BUILD + 14; // Pico / RP2040版識別用: VER() = 16114
+#endif
 		if (n == 3)
 			return LANG;
 		if (n == 4)
