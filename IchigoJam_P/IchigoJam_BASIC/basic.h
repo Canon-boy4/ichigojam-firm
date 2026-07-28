@@ -39,8 +39,13 @@
 // Array variable storage is extended using VAR2, but A-Z variable indices must remain stable.
 // [OLD] IJB_SIZEOF_ARRAY 102 (array[0..101]) and A-Z stored at indices 102..127
 // [NEW] keep IJB_SIZEOF_ARRAY at 102 for A-Z mapping; introduce IJB_SIZEOF_ARRAY_MAX for array bounds (0..357)
-#define IJB_SIZEOF_ARRAY 102			// uint16 (base for A-Z mapping)
-#define IJB_SIZEOF_ARRAY_MAX 358	// uint16 (array index 0..357)
+#define IJB_SIZEOF_ARRAY 102 // uint16 (base for A-Z mapping)
+
+#ifdef PICO_RP2350
+#define IJB_SIZEOF_ARRAY_MAX 1126 // RP2350: array index 0..1125
+#else
+#define IJB_SIZEOF_ARRAY_MAX 358 // RP2040: array index 0..357
+#endif
 #define IJB_SIZEOF_GOSUB_STACK 30 // call stack size for GOSUB/RETURN // 1.2b13 10->30  16*4=64byte -> 36*2=72 (+8byte)
 #define IJB_SIZEOF_FOR_STACK 6		// call stack size for FOR/NEXT // 1.2b10 4->6
 
@@ -300,13 +305,13 @@ int16 *const var2 = (int16 *)(ram + OFFSET_RAM_VAR2);
 
 // ===== MODIFIED =====
 // Map array index to the correct backing store.
-// [0..101]   -> VAR  (#800-#8CB)
-// [102..357] -> VAR2 (#C00-#DFE)
+// [0..101] -> VAR
+// [102..IJB_SIZEOF_ARRAY_MAX-1] -> VAR2
 S_INLINE int16 *basic_getArrayPtr(int16 idx)
 {
-	if (idx < 102)
+	if (idx < IJB_SIZEOF_ARRAY)
 		return &var[idx];
-	return &var2[idx - 102];
+	return &var2[idx - IJB_SIZEOF_ARRAY];
 }
 
 /*
@@ -1671,10 +1676,11 @@ static int16 token_expression5()
 		int n = token_opt1();
 		if (n == 0)
 #ifdef PICO_RP2350
-			return IJB_VER * 100 + IJB_BUILD + 20; // Pico 2 / RP2350版識別用: VER() = 16120
+			return IJB_VER * 100 + IJB_BUILD + 21; // Pico 2 / RP2350版識別用: VER() = 16121
 #else
 			return IJB_VER * 100 + IJB_BUILD + 14; // Pico / RP2040版識別用: VER() = 16114
 #endif
+
 		if (n == 3)
 			return LANG;
 		if (n == 4)
@@ -3906,9 +3912,13 @@ S_INLINE void command_help()
 {
 	//	put_str("MEM MAP\n#000 CHAR\n#700 PCG\n#800 VAR\n#900 VRAM\n#C00 LIST\n"); // b14 一時的に削除 ver 1.1正式版
 	// ===== MODIFIED =====
-	// Updated memory map to include VAR2 and moved LIST base
-	put_str("MEM MAP\n#000 CHAR\n#700 PCG\n#800 VAR\n#900 VRAM\n#C00 VAR2\n#E00 LIST\n"); // 配列変数の拡張版
-																																												//	put_str("MEM MAP\n#000 CHAR\n#700 PCG\n#800 VAR\n#900 VRAM\n#C00 LIST\n"); // 1.2b62
+	// Updated memory map to include VAR2 and moved LIST base 配列変数の拡張版
+#ifdef PICO_RP2350
+	put_str("MEM MAP\n#000 CHAR\n#700 PCG\n#800 VAR\n#900 VRAM\n#C00 VAR2\n#1400 LIST\n"); // RP2350: VAR2 [102..1125]
+#else
+	put_str("MEM MAP\n#000 CHAR\n#700 PCG\n#800 VAR\n#900 VRAM\n#C00 VAR2\n#E00 LIST\n"); // RP2040: VAR2 [102..357]
+#endif
+	//	put_str("MEM MAP\n#000 CHAR\n#700 PCG\n#800 VAR\n#900 VRAM\n#C00 LIST\n"); // 1.2b62
 
 	//	put_str("MEM MAP\nCHAR #000\nPCG  #700\nVAR  #800\nVRAM #900\nLIST #C00\n"); // "LIST\n#1002 KEY\n"
 	//	put_str("MEM MAP\nCHAR #000-#6FF\nPCG  #700-#7FF\nVAR  #800-#8FF\nVRAM #900-#BFF\nLIST #C00-#FFF\n"); // "LIST\n#1002 KEY\n"

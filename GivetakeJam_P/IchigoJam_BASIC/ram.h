@@ -15,9 +15,12 @@
 #define SIZE_RAM_VAR ((102 + 26) * 2) // 0x100
 #define SIZE_RAM_VRAM (32 * 24) // 0x300
 // ===== MODIFIED =====
-// Additional array variable area (VAR2) for [102..357]
-// basic:#C00-#DFF (0x200 bytes)
-#define SIZE_RAM_VAR2 (256 * 2) // 0x200
+// Additional array variable area (VAR2)
+#ifdef PICO_RP2350
+#define SIZE_RAM_VAR2 (1024 * 2) // RP2350: [102..1125], basic:#C00-#13FE, 0x800
+#else
+#define SIZE_RAM_VAR2 (256 * 2)  // RP2040: [102..357],  basic:#C00-#DFE,  0x200
+#endif
 // ===== MODIFIED =====
 // Program LIST area (must be >= IJB_SIZEOF_LIST)
 // [OLD] (1024 + 2)
@@ -36,10 +39,10 @@
 // ===== MODIFIED =====
 // VAR2 starts after VRAM
 #define OFFSET_RAM_VAR2 (OFFSET_RAM_VRAM + SIZE_RAM_VRAM) // basic:#C00
-#define OFFSET_RAM_LIST (OFFSET_RAM_VAR2 + SIZE_RAM_VAR2) // basic:#E00
+#define OFFSET_RAM_LIST (OFFSET_RAM_VAR2 + SIZE_RAM_VAR2) // RP2040:#E00, RP2350:#1400
 #define OFFSET_RAM_KEYBUF (OFFSET_RAM_LIST + SIZE_RAM_LIST) // basic:(after LIST)
-#define OFFSET_RAM_LINEBUF (OFFSET_RAM_KEYBUF + SIZE_RAM_KEYBUF) // basic:#1044 -> #1082-#1149
-#define OFFSET_RAM_I2CBUF (OFFSET_RAM_LINEBUF + SIZE_RAM_LINEBUF) // basic:#110C -> #114A-#117F
+#define OFFSET_RAM_LINEBUF (OFFSET_RAM_KEYBUF + SIZE_RAM_KEYBUF) // basic:#1044 -> RP2040:#1082-#1149, RP2350:#1682-#1749
+#define OFFSET_RAM_I2CBUF (OFFSET_RAM_LINEBUF + SIZE_RAM_LINEBUF) // basic:#110C -> RP2040:#114A-#117F, RP2350:#174A-#177F
 
 // ===== MODIFIED =====
 // Recompute total RAM size after expanding SIZE_RAM_LIST.

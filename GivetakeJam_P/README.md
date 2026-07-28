@@ -15,13 +15,13 @@ Extended IchigoJam BASIC for Raspberry Pi Pico with a 4096-byte program area, ex
 - Internal flash storage slots
   - Raspberry Pi Pico / RP2040: 25 slots
   - Raspberry Pi Pico 2 / RP2350: 100 slots
-- Array variables expanded from `[0]..[101]` to `[0]..[357]`
+- Array variables expanded from `[0]..[101]` to RP2040:`[0]..[357]`, RP2350:`[0]..[1125]
 - Added `VAR2` area at `#C00`
-- LIST area moved to `#E00`
+- LIST area moved to RP2040:`#E00`, RP2350:`#1400`
 - Improved external EEPROM handling
 - Added `IR.IN` command for NEC infrared reception
 - Added `ENV.IN` command for AHT20 + BMP280 environment sensing
-- `VER()` returns `16120` on Raspberry Pi Pico 2 / RP2350
+- `VER()` returns `16121` on Raspberry Pi Pico 2 / RP2350
 
 ## Memory Map
 
@@ -31,7 +31,8 @@ Extended IchigoJam BASIC for Raspberry Pi Pico with a 4096-byte program area, ex
 #800 VAR
 #900 VRAM
 #C00 VAR2
-#E00 LIST
+#E00 LIST (RP2040)
+#1400 LIST (RP2350)
 ```
 
 ## Features / Changes
@@ -40,16 +41,16 @@ Extended IchigoJam BASIC for Raspberry Pi Pico with a 4096-byte program area, ex
 - Reduced internal storage slots from 100 to 25
 - Extended array variables
   - Original: `[0]..[101]`
-  - Extended: `[102]..[357]`
+  - Extended: RP2040:`[102]..[357]`, RP2350:`[102]..[1125]
   - `VAR`  = `#800..#8CA`
-  - `VAR2` = `#C00..#DFE`
+  - `VAR2` = RP2040:`#C00..#DFE`, RP2350:`#C00..#13FE`
 - Fixed array-related issues
   - Correct handling of extended array area
   - Fixed `FOR/NEXT` behavior with array variables
   - `CLV` / `CLEAR` now reset the extended array region
   - Added support for indirect array access `[[x]]`
 - Improved `FILES` command behavior
-  - `FILES` → internal storage only (`0..24`)
+  - `FILES` → internal storage only RP2040(`0..24`),RP2350(`0..99`)
   - `FILES0` → internal + external EEPROM (`100..131` if detected)
   - `FILES n` → shows `0..n` and skips unused `25..99`
 - Improved external EEPROM support
@@ -60,7 +61,7 @@ Extended IchigoJam BASIC for Raspberry Pi Pico with a 4096-byte program area, ex
 - Added `ENV.IN` command for AHT20 + BMP280 environment sensing
 - Built-in `HELP` memory map updated
 - `VER()` returns `16114` on Raspberry Pi Pico / RP2040
-- `VER()` returns `16120` on Raspberry Pi Pico 2 / RP2350
+- `VER()` returns `16121` on Raspberry Pi Pico 2 / RP2350
 - Platform identification by `VER(1)`
   - Raspberry Pi Pico / RP2040: `8`
   - Raspberry Pi Pico 2 / RP2350: `9`
@@ -132,6 +133,7 @@ Confirmed features on Pico 2:
   - result array: `[0]` to `[6]`
   - IR DMA uses channel 10
 - Internal flash `SAVE` / `LOAD` / `FILES`
+  - Internal flash slots `0` to `99`
 - External I2C EEPROM slots `100` to `131`
 - `LRUN` from external EEPROM
 
@@ -277,9 +279,9 @@ Then build as usual. When `IchigoJam_P.uf2` is generated, write it to the Pico.
 
 - `GivetakeJam_P.uf2`
 - Write this firmware to Raspberry Pi Pico 2 / RP2350.
-- `SHA-256`: `7F620F48A46A73C7527B8BB1672E14B0AB25BDD745C528423F1127F7326B2D11`
-- `MD5`: `51C583CCD7E7AA52585D2CC9403789E6`
-- `SHA-1`: `6FE9B8AD4C843ACA8865DD6637ACEB26B925127A`
+- `SHA-256`: `CEB6EC07FF7C961C88465B07C374F4C893530B3F52D510529CDDD297604278E0`
+- `MD5`: `2D83E119F4B17EFA7FD883136DBD14D4`
+- `SHA-1`: `91192415EA7FE18E493892F108230529800D08E9`
 
 ## Test Programs
 
@@ -342,3 +344,4 @@ A license is required for redistribution to third parties.
 Givetakewinwin  
 Created: 2026-05-29
 Updated on 2026-07-18 for Raspberry Pi Pico 2 / RP2350 HSTX DVI support.
+Updated on 2026-07-29 for Raspberry Pi Pico 2 / Array variables 1125.

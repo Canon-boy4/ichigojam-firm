@@ -3,10 +3,12 @@
 ![Platform](https://img.shields.io/badge/platform-Raspberry%20Pi%20Pico-blue)
 ![Language](https://img.shields.io/badge/language-BASIC-orange)
 ![License](https://img.shields.io/badge/license-IchigoJam-green)
-![Version](https://img.shields.io/badge/version-16120-brightgreen)
+![Version](https://img.shields.io/badge/version-16121-brightgreen)
 ![Status](https://img.shields.io/badge/status-stable-success)
 
 ## プログラム容量の拡張、配列変数の拡張、外部EEPROM対応の改善、NEC方式の赤外線受信コマンド、環境測定コマンドの追加を行い、従来のIchigoJam P BASICの互換性を維持しながら機能強化しています。
+### Pico 2 / RP2350版の配列領域拡張
+Pico 2 / RP2350版では、増加RAMを利用して配列変数領域 VAR2 を拡張しています。
 
 ## 機能 / 変更点
 
@@ -18,7 +20,7 @@
 
 - 配列変数を拡張：
   - オリジナル：[0] ～ [101]
-  - 追加した変数：[102] ～ [357]
+  - 追加した変数：RP2040版[102] ～ [357]、RP2350版[102] ～ [1125]
     - #C00 に VAR2 追加
 
 - 配列関連の不具合修正：
@@ -27,16 +29,16 @@
   - 間接参照 [[x]] に対応
 
 - FILESコマンド改善：
-  - FILES → 0～24
+  - FILES → RP2040版:0～24、RP2350版:0～99
   - FILES0 → 外部EEPROMがあれば 100～131
-  - FILES n → 0～n（25～99はスキップ）
+  - FILES n → 0～n（RP2040版は25～99をスキップ）
 
 - 外部EEPROM 対応の改善
   - 外部EEPROM検出を I2Cアドレス 0x50 のACKで実装
   - 24LC64 / 24LC256 / 24FC1025 に単一バイナリで対応
   - EEPROM書き込みを32バイト分割にして安全性向上
 
-- LIST エリアを #E00 に移動
+- LIST エリアを RP2040版:#E00 に移動、RP2350版:#1400 に移動
 
 - メモリマップ更新：
   - #000 CHAR
@@ -44,7 +46,8 @@
   - #800 VAR
   - #900 VRAM
   - #C00 VAR2
-  - #E00 LIST（4096バイト）
+  - #E00 LIST (4096バイト) RP2040版
+  - #1400 LIST (4096バイト) RP2350版
 
 - HX1838系赤外線リモコン受信モジュール向け NEC方式赤外線受信コマンド IR.IN を追加
   - 書式
@@ -66,7 +69,7 @@
   - 使用例
     ```basic
     10 CLS
-    20 IR.IN 4,[0]:IF [5]<>0 CONT
+    20 IR.IN 1,[0]:IF [5]<>0 CONT
     30 A=[2] & #FF
     40 ?HEX$(A,2)
     ```
@@ -92,6 +95,7 @@
       - 結果配列は`[0]`〜`[6]`
       - IR用DMAはチャネル10を使用
     - 内蔵フラッシュの`SAVE` / `LOAD` / `FILES`
+      - 内蔵フラッシュのスロット`0`〜`99`
     - 外部I2C EEPROMのスロット`100`〜`131`
     - 外部EEPROMからの`LRUN`
   - `IR.IN`使用例
@@ -130,7 +134,7 @@
 
 - 拡張版識別のため `VER()` を変更
   - Raspberry Pi Pico / RP2040版: `16114`
-  - Raspberry Pi Pico 2 / RP2350版: `16120`
+  - Raspberry Pi Pico 2 / RP2350版: `16121`
 
   使用例 BASIC
 
@@ -145,7 +149,7 @@
   Raspberry Pi Pico 2 / RP2350版:
   ```sh
   ? VER()
-  16120
+  16121
   ? VER(1)
   9
   ```
@@ -215,9 +219,9 @@ make
 
 - `GivetakeJam_P.uf2`: Raspberry Pi Pico 2 / RP2350用の4K版ファームウェアファイルです。
 - チェックサム
-  - SHA-256: `7F620F48A46A73C7527B8BB1672E14B0AB25BDD745C528423F1127F7326B2D11`
-  - MD5: `51C583CCD7E7AA52585D2CC9403789E6`
-  - SHA-1: `6FE9B8AD4C843ACA8865DD6637ACEB26B925127A`
+  - SHA-256: `CEB6EC07FF7C961C88465B07C374F4C893530B3F52D510529CDDD297604278E0`
+  - MD5: `2D83E119F4B17EFA7FD883136DBD14D4`
+  - SHA-1: `91192415EA7FE18E493892F108230529800D08E9`
 
 ## Screenshot
 
@@ -263,5 +267,6 @@ make
 ギブテクウインウイン
 2026/5/29 作成
 2026/7/18 Pico 2 / RP2350 HSTX DVI版を追加
+2026/7/29 Pico 2 配列変数を 1125 まで増加
 ![Release](https://img.shields.io/github/v/release/IchigoJam/ichigojam-firm)
 ![Downloads](https://img.shields.io/github/downloads/IchigoJam/ichigojam-firm/total)
