@@ -773,6 +773,7 @@ S_INLINE uint screen_pset(int x, int y, int cmd) { // point機能追加 1.3.2b19
 			p ^= 1 << n;
 		}
 		*pp = p;
+		screen_dirty_row(y >> 1);
 	}
 	return 0;
 }
