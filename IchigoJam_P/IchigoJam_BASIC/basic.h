@@ -1676,7 +1676,7 @@ static int16 token_expression5()
 		int n = token_opt1();
 		if (n == 0)
 #ifdef PICO_RP2350
-			return IJB_VER * 100 + IJB_BUILD + 21; // Pico 2 / RP2350版識別用: VER() = 16121
+			return IJB_VER * 100 + IJB_BUILD + 22; // Pico 2 / RP2350版識別用: VER() = 16122
 #else
 			return IJB_VER * 100 + IJB_BUILD + 14; // Pico / RP2040版識別用: VER() = 16114
 #endif

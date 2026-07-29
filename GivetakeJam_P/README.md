@@ -3,7 +3,7 @@
 ![Platform](https://img.shields.io/badge/platform-Raspberry%20Pi%20Pico-blue)
 ![Language](https://img.shields.io/badge/language-BASIC-orange)
 ![License](https://img.shields.io/badge/license-IchigoJam-green)
-![Version](https://img.shields.io/badge/version-16120-brightgreen)
+![Version](https://img.shields.io/badge/version-16122-brightgreen)
 ![Status](https://img.shields.io/badge/status-stable-success)
 
 Extended IchigoJam BASIC for Raspberry Pi Pico with a 4096-byte program area, expanded arrays, improved external EEPROM support, NEC infrared reception, and environmental sensing.
@@ -21,7 +21,7 @@ Extended IchigoJam BASIC for Raspberry Pi Pico with a 4096-byte program area, ex
 - Improved external EEPROM handling
 - Added `IR.IN` command for NEC infrared reception
 - Added `ENV.IN` command for AHT20 + BMP280 environment sensing
-- `VER()` returns `16121` on Raspberry Pi Pico 2 / RP2350
+- `VER()` returns `16122` on Raspberry Pi Pico 2 / RP2350
 
 ## Memory Map
 
@@ -61,7 +61,7 @@ Extended IchigoJam BASIC for Raspberry Pi Pico with a 4096-byte program area, ex
 - Added `ENV.IN` command for AHT20 + BMP280 environment sensing
 - Built-in `HELP` memory map updated
 - `VER()` returns `16114` on Raspberry Pi Pico / RP2040
-- `VER()` returns `16121` on Raspberry Pi Pico 2 / RP2350
+- `VER()` returns `16122` on Raspberry Pi Pico 2 / RP2350
 - Platform identification by `VER(1)`
   - Raspberry Pi Pico / RP2040: `8`
   - Raspberry Pi Pico 2 / RP2350: `9`
@@ -122,12 +122,15 @@ The Raspberry Pi Pico 2 / RP2350 build supports HSTX DVI video output.
 Confirmed features on Pico 2:
 
 - HSTX DVI video output
+  - Optimized HSTX DVI text rendering by updating only dirty screen rows.
+  - Fixed DRAW screen update with dirty-row rendering.
 - USB keyboard input
+  - Default keyboard layout is Japanese when the keyboard setting flash area is unset.
 - `BEEP` / `PLAY` sound output on GPIO20
 - `VIDEO 0` / `VIDEO 1` display control
   - `VIDEO 0` clears the screen and stops screen updates
   - the HSTX DVI signal itself continues running
-  - `VIDEO 1` resumes screen updates
+  - `VIDEO 1` resumes screen updates and fixed screen redraw after resume.
 - `IR.IN` using RP2350 PIO + DMA
   - confirmed on IN1 to IN4
   - result array: `[0]` to `[6]`
@@ -279,9 +282,9 @@ Then build as usual. When `IchigoJam_P.uf2` is generated, write it to the Pico.
 
 - `GivetakeJam_P.uf2`
 - Write this firmware to Raspberry Pi Pico 2 / RP2350.
-- `SHA-256`: `CEB6EC07FF7C961C88465B07C374F4C893530B3F52D510529CDDD297604278E0`
-- `MD5`: `2D83E119F4B17EFA7FD883136DBD14D4`
-- `SHA-1`: `91192415EA7FE18E493892F108230529800D08E9`
+- `SHA-256`: `CAC706ED6CC9CE92CA6D499A869DE295E9FE29FAA49EB567BD5944DB99ED9411`
+- `MD5`: `D9D0C516BED32174AC0C8BE658F9787A`
+- `SHA-1`: `72BC5D2693692A4ACBA0C6D8EBBEAB5597ACDB66`
 
 ## Test Programs
 

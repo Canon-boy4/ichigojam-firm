@@ -3,7 +3,7 @@
 ![Platform](https://img.shields.io/badge/platform-Raspberry%20Pi%20Pico-blue)
 ![Language](https://img.shields.io/badge/language-BASIC-orange)
 ![License](https://img.shields.io/badge/license-IchigoJam-green)
-![Version](https://img.shields.io/badge/version-16121-brightgreen)
+![Version](https://img.shields.io/badge/version-16122-brightgreen)
 ![Status](https://img.shields.io/badge/status-stable-success)
 
 ## プログラム容量の拡張、配列変数の拡張、外部EEPROM対応の改善、NEC方式の赤外線受信コマンド、環境測定コマンドの追加を行い、従来のIchigoJam P BASICの互換性を維持しながら機能強化しています。
@@ -83,13 +83,14 @@ Pico 2 / RP2350版では、増加RAMを利用して配列変数領域 VAR2 を�
 - Raspberry Pi Pico 2 / RP2350 対応
   - Pico 2 / RP2350 ビルドでは、HSTX DVI表示に対応しています。
   - Pico 2で確認済みの機能
-    - HSTX DVI表示
-    - USBキーボード入力
+    - HSTX DVI表示をdirty行更新方式に変更し、画面更新処理を軽量化。
+    - DRAW命令による描画がdirty行更新で反映されるよう修正。
+    - USBキーボードを使用、KBD設定が未設定の場合は日本語キーボード設定に変更。
     - GPIO20での`BEEP` / `PLAY`音声出力
     - `VIDEO 0` / `VIDEO 1`表示制御
-      - `VIDEO 0`で画面を消し、画面更新を停止します
-      - HSTX DVI信号自体は出力を継続します
-      - `VIDEO 1`で画面更新を再開します
+      - `VIDEO 0`で画面を消し、画面更新を停止。
+      - HSTX DVI信号自体は出力を継続。
+      - `VIDEO 1`で画面更新を再開、画面全体を再描画するよう補強。
     - RP2350 PIO + DMAによる`IR.IN`
       - IN1〜IN4で確認済み
       - 結果配列は`[0]`〜`[6]`
@@ -134,7 +135,7 @@ Pico 2 / RP2350版では、増加RAMを利用して配列変数領域 VAR2 を�
 
 - 拡張版識別のため `VER()` を変更
   - Raspberry Pi Pico / RP2040版: `16114`
-  - Raspberry Pi Pico 2 / RP2350版: `16121`
+  - Raspberry Pi Pico 2 / RP2350版: `16122`
 
   使用例 BASIC
 
@@ -149,7 +150,7 @@ Pico 2 / RP2350版では、増加RAMを利用して配列変数領域 VAR2 を�
   Raspberry Pi Pico 2 / RP2350版:
   ```sh
   ? VER()
-  16121
+  16122
   ? VER(1)
   9
   ```
@@ -219,9 +220,9 @@ make
 
 - `GivetakeJam_P.uf2`: Raspberry Pi Pico 2 / RP2350用の4K版ファームウェアファイルです。
 - チェックサム
-  - SHA-256: `CEB6EC07FF7C961C88465B07C374F4C893530B3F52D510529CDDD297604278E0`
-  - MD5: `2D83E119F4B17EFA7FD883136DBD14D4`
-  - SHA-1: `91192415EA7FE18E493892F108230529800D08E9`
+  - SHA-256: `CAC706ED6CC9CE92CA6D499A869DE295E9FE29FAA49EB567BD5944DB99ED9411`
+  - MD5: `D9D0C516BED32174AC0C8BE658F9787A`
+  - SHA-1: `72BC5D2693692A4ACBA0C6D8EBBEAB5597ACDB66`
 
 ## Screenshot
 
