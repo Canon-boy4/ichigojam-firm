@@ -20,7 +20,18 @@ static uint8_t tflash[FLASH_SECTOR_SIZE];//フラッシュの中身の一部を�
 
 static inline uint key_getKeyboardID() {
     uint mode = get_flash(get_config_offset())[0];
+
+#ifdef PICO_RP2350
+    // RP2350版は未設定Flash 0xFF の場合、日本語キーボードをデフォルトにする。
+    // KBD 0 が明示保存されている場合だけ US にする。
+    if (mode == MODE_US) {
+        return MODE_US;
+    }
+    return MODE_JA;
+#else
+    // RP2040版は従来動作を維持する。
     return mode == MODE_JA;
+#endif
 }
 
 void set_keymap(uint mode) {
