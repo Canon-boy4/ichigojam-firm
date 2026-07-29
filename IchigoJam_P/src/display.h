@@ -25,6 +25,7 @@ void video_on()
     // VIDEO 1/2/3/4 で画面更新を再開する。
     // HSTX開始は pico_init() 側で一度だけ行う。
     hstx_screen_active = 1;
+    screen_dirty_all();
 }
 
 void video_off(int clkdiv)
