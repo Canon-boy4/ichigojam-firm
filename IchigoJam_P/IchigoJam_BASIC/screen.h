@@ -484,6 +484,8 @@ static void memclear2(uint8* mem, int len) {
 }
 */
 static void screen_putc(char c) {
+	int dirty_y_before = _g.cursory;
+	screen_dirty_row(dirty_y_before);
 //	c = '1'; // test
 //	printf("%d %d\n", _g.cursorx, _g.cursory);
 	
@@ -738,6 +740,8 @@ static void screen_putc(char c) {
 				screen_enter();
 		}
 	}
+	screen_dirty_row(dirty_y_before);
+	screen_dirty_row(_g.cursory);
 }
 S_INLINE void screen_puts(char* s) {
 	while (*s)

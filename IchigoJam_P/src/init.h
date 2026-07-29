@@ -201,6 +201,28 @@ void vram_to_hstx_all(bool visible_cursor) {
     }
 }
 
+void vram_to_hstx_dirty(bool visible_cursor) {
+    static int prev_cursor_y = -1;
+
+    if (_g.cursory >= 0 && _g.cursory < SCREEN_H) {
+        screen_dirty_row(_g.cursory);
+    }
+
+    if (prev_cursor_y >= 0 && prev_cursor_y < SCREEN_H &&
+        prev_cursor_y != _g.cursory) {
+        screen_dirty_row(prev_cursor_y);
+    }
+
+    for (int vram_y = 0; vram_y < SCREEN_H; vram_y++) {
+        if (screen_dirty_test(vram_y)) {
+            vram_to_hstx_row(vram_y, visible_cursor);
+            screen_dirty_clear_row(vram_y);
+        }
+    }
+
+    prev_cursor_y = _g.cursory;
+}
+
 #endif  // PICO_RP2350
 
 //hid_app.cが複雑になってるので、もっと簡潔に処理できるなら直したい
@@ -228,7 +250,7 @@ bool timer(repeating_timer_t* rt) {
 
     hstx_draw_div++;
     if ((hstx_draw_div & 1) == 0) {
-        vram_to_hstx_all(_g.cursorflg);
+        vram_to_hstx_dirty(_g.cursorflg);
     }
 #else
     vram_to_framebuf_all(_g.cursorflg);
