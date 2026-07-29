@@ -130,67 +130,74 @@ void vram_to_framebuf_all(bool visible_cursor) {
 #define HSTX_BG_COLOUR 0x00
 #define HSTX_FG_COLOUR 0xFF
 
-void vram_to_hstx_all(bool visible_cursor) {
+void vram_to_hstx_row(int vram_y, bool visible_cursor) {
     const int mag = 1 << _g.screen_big;
 
     const int dot_size = 2 * mag;
     const int margin_x = MARGIN_WIDTH * 2;
     const int margin_y = MARGIN_HEIGHT * 2;
 
-    // HSTXフレームバッファ全体の消去はVIDEO 0や初期化側で行う。
-    // ここではVRAM内容だけを文字描画領域へ反映する。
+    if (vram_y < 0 || vram_y >= SCREEN_H) {
+        return;
+    }
 
-    for (int vram_y = 0; vram_y < SCREEN_H; vram_y++) {
-        for (int font_y = 0; font_y < FONT_SIZE; font_y++) {
-            const int dst_y =
-                margin_y +
-                (vram_y * FONT_SIZE + font_y) * dot_size;
+    for (int font_y = 0; font_y < FONT_SIZE; font_y++) {
+        const int dst_y =
+            margin_y +
+            (vram_y * FONT_SIZE + font_y) * dot_size;
 
-            // dot_size行ぶん、同じ文字ラインを描く。
-            for (int repeat_y = 0; repeat_y < dot_size; repeat_y++) {
-                uint8_t *dst = &hstx_framebuf[
-                    (dst_y + repeat_y) * HSTX_MODE_H_ACTIVE_PIXELS + margin_x
-                ];
+        // dot_size行ぶん、同じ文字ラインを描く。
+        for (int repeat_y = 0; repeat_y < dot_size; repeat_y++) {
+            uint8_t *dst = &hstx_framebuf[
+                (dst_y + repeat_y) * HSTX_MODE_H_ACTIVE_PIXELS + margin_x
+            ];
 
-                for (int vram_x = 0; vram_x < SCREEN_W; vram_x++) {
-                    uint8_t ch = vram[vram_y * SCREEN_W + vram_x];
+            for (int vram_x = 0; vram_x < SCREEN_W; vram_x++) {
+                uint8_t ch = vram[vram_y * SCREEN_W + vram_x];
 
-                    uint8_t char_line =
-                        CHAR_PATTERN[ch * FONT_SIZE + font_y];
+                uint8_t char_line =
+                    CHAR_PATTERN[ch * FONT_SIZE + font_y];
 
-                    if (ch >= 0xE0) {
-                        char_line =
-                            screen_pcg[
-                                (ch - 0xE0) * FONT_SIZE + font_y
-                            ];
-                    }
+                if (ch >= 0xE0) {
+                    char_line =
+                        screen_pcg[
+                            (ch - 0xE0) * FONT_SIZE + font_y
+                        ];
+                }
 
-                    // VIDEO命令による白黒反転
-                    char_line ^= 0xFF * _g.screen_invert;
+                // VIDEO命令による白黒反転
+                char_line ^= 0xFF * _g.screen_invert;
 
-                    // カーソルの点滅・反転
-                    if (((frames >> 4) & visible_cursor) &&
-                        _g.cursorx == vram_x &&
-                        _g.cursory == vram_y) {
+                // カーソルの点滅・反転
+                if (((frames >> 4) & visible_cursor) &&
+                    _g.cursorx == vram_x &&
+                    _g.cursory == vram_y) {
 
-                        char_line ^=
-                            key_flg.insert ? 0xFF : 0xF0;
-                    }
+                    char_line ^=
+                        key_flg.insert ? 0xFF : 0xF0;
+                }
 
-                    // フォント1行の8ドットを、横方向へdot_size倍に展開する。
-                    for (int font_x = 0; font_x < FONT_SIZE; font_x++) {
-                        uint8_t colour =
-                            ((char_line >> (7 - font_x)) & 1)
-                            ? HSTX_FG_COLOUR
-                            : HSTX_BG_COLOUR;
+                // フォント1行の8ドットを、横方向へdot_size倍に展開する。
+                for (int font_x = 0; font_x < FONT_SIZE; font_x++) {
+                    uint8_t colour =
+                        ((char_line >> (7 - font_x)) & 1)
+                        ? HSTX_FG_COLOUR
+                        : HSTX_BG_COLOUR;
 
-                        for (int repeat_x = 0; repeat_x < dot_size; repeat_x++) {
-                            *dst++ = colour;
-                        }
+                    for (int repeat_x = 0; repeat_x < dot_size; repeat_x++) {
+                        *dst++ = colour;
                     }
                 }
             }
         }
+    }
+}
+
+void vram_to_hstx_all(bool visible_cursor) {
+    // HSTXフレームバッファ全体の消去はVIDEO 0や初期化側で行う。
+    // ここではVRAM内容だけを文字描画領域へ反映する。
+    for (int vram_y = 0; vram_y < SCREEN_H; vram_y++) {
+        vram_to_hstx_row(vram_y, visible_cursor);
     }
 }
 
