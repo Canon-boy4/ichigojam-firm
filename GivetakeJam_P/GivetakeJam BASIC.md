@@ -3,7 +3,7 @@
 
 ![Platform](https://img.shields.io/badge/platform-Raspberry%20Pi%20Pico-blue)
 ![Language](https://img.shields.io/badge/language-BASIC-orange)
-![Version](https://img.shields.io/badge/VER()-16114-brightgreen)
+![Version](https://img.shields.io/badge/VER()-16122-brightgreen)
 ![Status](https://img.shields.io/badge/status-stable-success)
 
 ## Overview / 概要
@@ -20,18 +20,22 @@ This firmware enhances program capacity, expands array variables, improves exter
 - `16100` : original base version
 - `16112` : infrared receiver build
 - `16114` : environmental measurement build
+- `16120` : RP2350 build supports HSTX DVI video output.
+- `16121` : RP2350 build extended arrays to `[358]..[1125]`
+- `16122` : RP2350 HSTX DVI dirty-row rendering, DRAW redraw fix, VIDEO resume redraw fix, and Japanese keyboard default when unset.
 
 ## Highlights / 主な特徴
 
 - 4096-byte program size
-- 25 internal storage slots
-- Extended arrays `[0]..[357]`
+- Internal storage slots RP2040:`25`, RP2350:`100`
+- Extended arrays RP2040:`[102]..[357]`, RP2350:`[102]..[1125]`
 - `VAR2` area at `#C00`
+- `LIST` area at RP2040:`#E00`, RP2350:`#1400`
 - `IR.IN` NEC infrared receiver command
 - `ENV.IN` AHT20 + BMP280 environment sensor command
 - External EEPROM support (`24LC64` / `24LC256` / `24FC1025`)
 
-## Memory Map
+## Memory Map / メモリーマップ
 
 ```text
 #000 CHAR
@@ -39,10 +43,11 @@ This firmware enhances program capacity, expands array variables, improves exter
 #800 VAR
 #900 VRAM
 #C00 VAR2
-#E00 LIST
+#E00 LIST (RP2040)
+#1400 LIST (RP2350)
 ```
 
-## Screenshots
+## Screenshots / スクリーンショット
 
 ### Runtime Environment
 ![Runtime Environment](./docs/IMG_2095up.png)
@@ -56,4 +61,4 @@ This firmware enhances program capacity, expands array variables, improves exter
 ## Main Documents
 
 - English: `README.md`
-- Japanese: `README_JA.md`
+- 日本語: `README_JA.md`
