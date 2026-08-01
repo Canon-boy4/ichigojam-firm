@@ -34,6 +34,7 @@ This firmware enhances program capacity, expands array variables, improves exter
 - `IR.IN` NEC infrared receiver command
 - `ENV.IN` AHT20 + BMP280 environment sensor command
 - External EEPROM support (`24LC64` / `24LC256` / `24FC1025`)
+- RP2350 build: default keyboard layout is Japanese when the keyboard setting flash area is unset.
 
 ## Memory Map / メモリーマップ
 
