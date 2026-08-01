@@ -640,6 +640,7 @@ static void screen_putc(char c) {
 	} else if (c == 12) { // 0x0c 書式送り カーソル位置以降削除
 		int now = _g.cursory * SCREEN_W + _g.cursorx;
 		memclear(vram + now, SCREEN_W * SCREEN_H - now);
+		screen_dirty_all();
 	} else if (c == 0x12) { // home
 		int now = _g.cursory * SCREEN_W + _g.cursorx;
 		for (; now > 0;) {
