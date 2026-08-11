@@ -3,7 +3,7 @@
 ![Platform](https://img.shields.io/badge/platform-Raspberry%20Pi%20Pico-blue)
 ![Language](https://img.shields.io/badge/language-BASIC-orange)
 ![License](https://img.shields.io/badge/license-IchigoJam-green)
-![Version](https://img.shields.io/badge/version-16122-brightgreen)
+![Version](https://img.shields.io/badge/version-16123-brightgreen)
 ![Status](https://img.shields.io/badge/status-stable-success)
 
 ## プログラム容量の拡張、配列変数の拡張、外部EEPROM対応の改善、NEC方式の赤外線受信コマンド、環境測定コマンドの追加を行い、従来のIchigoJam P BASICの互換性を維持しながら機能強化しています。
@@ -27,6 +27,9 @@ Pico 2 / RP2350版では、増加RAMを利用して配列変数領域 VAR2 を�
   - FOR/NEXT 動作を修正
   - CLV / CLEAR で拡張配列領域も初期化されるよう修正
   - 間接参照 [[x]] に対応
+  - `WS.LED` が拡張配列領域を正しく参照するよう修正。
+  - RP2350版では最大375個のWS2812Bを配列 `[0]..[1124]` から送信可能。
+  - `WS.LED` のLED数指定が配列上限を超える場合、`Index out of range` を返すよう修正。
 
 - FILESコマンド改善：
   - FILES → RP2040版:0～24、RP2350版:0～99
@@ -134,15 +137,15 @@ Pico 2 / RP2350版では、増加RAMを利用して配列変数領域 VAR2 を�
   - 使用例 プログラム ENV_IN_TEST.BAS
 
 - 拡張版識別のため `VER()` を変更
-  - Raspberry Pi Pico / RP2040版: `16114`
-  - Raspberry Pi Pico 2 / RP2350版: `16122`
+  - Raspberry Pi Pico / RP2040版: `16115`
+  - Raspberry Pi Pico 2 / RP2350版: `16123`
 
   使用例 BASIC
 
   Raspberry Pi Pico / RP2040版:
   ```sh
   ? VER()
-  16114
+  16115
   ? VER(1)
   8
   ```
@@ -150,7 +153,7 @@ Pico 2 / RP2350版では、増加RAMを利用して配列変数領域 VAR2 を�
   Raspberry Pi Pico 2 / RP2350版:
   ```sh
   ? VER()
-  16122
+  16123
   ? VER(1)
   9
   ```
@@ -210,9 +213,9 @@ make
     - IchigoJam P の時の様にビルドして、`IchigoJam_P.uf2`ファイルが作成できたらpicoに書き込みます。
     - IchigoJam_P.uf2: Raspberry Pi Pico / RP2040用の4K版ファームウェアファイルです。
     - チェックサム
-      SHA-256: 8C5F00629A0658B1B815B549B754F257A34DDB45CAFC131F4E4AB596C037569B
-      MD5: 327331C46DDF7C06408C4E95AA98D395
-      SHA-1: C8544B114B293DBF27BD3738DC0F289F317FA6C4
+      SHA-256: CAEC5D43C6B2C485FFE31619B1CC472A64A82E77C53030E415C03E43CB604D6B
+      MD5: 98BDA73D4EEF1A4CE3BE179E88A93098
+      SHA-1: A11FCDCB20C2FABF54DDD968EB3895AFF7537FD6
 
     - ARRAY_VAR_TOTAL_TEST.BAS: 配列変数のテストプログラムです。このテストが ALL OK で通ることを確認しています。
 
@@ -220,9 +223,9 @@ make
 
 - `GivetakeJam_P.uf2`: Raspberry Pi Pico 2 / RP2350用の4K版ファームウェアファイルです。
 - チェックサム
-  - SHA-256: `CAC706ED6CC9CE92CA6D499A869DE295E9FE29FAA49EB567BD5944DB99ED9411`
-  - MD5: `D9D0C516BED32174AC0C8BE658F9787A`
-  - SHA-1: `72BC5D2693692A4ACBA0C6D8EBBEAB5597ACDB66`
+  - SHA-256: `27FC9B9DA14D30985C53340F3B55AA07A787BF4DDAA86F7F66F3D6D64C27C20E`
+  - MD5: `90B32450ECE56227C83CD47104B88CB1`
+  - SHA-1: `10636FE35182C125B21CD97AE8DFCBFDD5747FCE`
 
 ## Screenshot
 
@@ -269,5 +272,6 @@ make
 2026/5/29 作成
 2026/7/18 Pico 2 / RP2350 HSTX DVI版を追加
 2026/7/29 Pico 2 配列変数を 1125 まで増加
+2026/8/10 `WS.LED` の拡張配列変数へのアクセスと上限チェックを修正
 ![Release](https://img.shields.io/github/v/release/IchigoJam/ichigojam-firm)
 ![Downloads](https://img.shields.io/github/downloads/IchigoJam/ichigojam-firm/total)

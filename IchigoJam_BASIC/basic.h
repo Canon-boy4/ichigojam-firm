@@ -3435,10 +3435,18 @@ S_INLINE void command_iot_out() {
 }
 #endif
 
-S_INLINE void command_ws_out(int port) {
-	//int p = token_expression();
+S_INLINE void command_ws_out(int port)
+{
+	// int p = token_expression();
 	int n = token_expression();
 	int m = token_option1(1);
+
+	// WS.LEDはLED 1個につきRGBの3要素を配列から読む。
+	// 配列上限を超えるLED数を指定した場合は、送信前にエラーにする。
+	if (n < 0 || n * 3 > IJB_SIZEOF_ARRAY_MAX) {
+		command_error(ERR_INDEX_OUT_OF_RANGE);
+	}
+
 	ws_out(port, n, m);
 }
 

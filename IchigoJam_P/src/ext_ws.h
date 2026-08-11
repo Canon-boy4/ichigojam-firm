@@ -28,7 +28,9 @@ void __not_in_flash_func(ws_out) (int port, int nled, int repeat) {
     int save = save_and_disable_interrupts();
     for (int i = 0; i < repeat; i++) {
         for (int j = 0; j < nled * 3; j++) {//1つのLEDにつき、3つの変数が必要
-            uint16 v = var[j];
+            // 配列領域はRP2040/RP2350で配置と上限が異なるため、
+            // var[]を直接参照せず、BASIC配列アクセス用の共通関数を使う。
+            uint16 v = *basic_getArrayPtr(j);
             for (int k = 7; k >= 0; k--) {
                 bool bit = v & (0x01 << k);
                 wsled_send_one_signal(bit);

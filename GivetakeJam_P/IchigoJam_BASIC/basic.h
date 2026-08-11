@@ -1676,9 +1676,9 @@ static int16 token_expression5()
 		int n = token_opt1();
 		if (n == 0)
 #ifdef PICO_RP2350
-			return IJB_VER * 100 + IJB_BUILD + 22; // Pico 2 / RP2350版識別用: VER() = 16122
+			return IJB_VER * 100 + IJB_BUILD + 23; // Pico 2 / RP2350版識別用: VER() = 16123
 #else
-			return IJB_VER * 100 + IJB_BUILD + 14; // Pico / RP2040版識別用: VER() = 16114
+			return IJB_VER * 100 + IJB_BUILD + 15; // Pico / RP2040版識別用: VER() = 16115
 #endif
 
 		if (n == 3)
@@ -4265,6 +4265,13 @@ S_INLINE void command_ws_out(int port)
 	// int p = token_expression();
 	int n = token_expression();
 	int m = token_option1(1);
+
+	// WS.LEDはLED 1個につきRGBの3要素を配列から読む。
+	// 配列上限を超えるLED数を指定した場合は、送信前にエラーにする。
+	if (n < 0 || n * 3 > IJB_SIZEOF_ARRAY_MAX) {
+		command_error(ERR_INDEX_OUT_OF_RANGE);
+	}
+
 	ws_out(port, n, m);
 }
 

@@ -3,7 +3,7 @@
 ![Platform](https://img.shields.io/badge/platform-Raspberry%20Pi%20Pico-blue)
 ![Language](https://img.shields.io/badge/language-BASIC-orange)
 ![License](https://img.shields.io/badge/license-IchigoJam-green)
-![Version](https://img.shields.io/badge/version-16122-brightgreen)
+![Version](https://img.shields.io/badge/version-16123-brightgreen)
 ![Status](https://img.shields.io/badge/status-stable-success)
 
 Extended IchigoJam BASIC for Raspberry Pi Pico with a 4096-byte program area, expanded arrays, improved external EEPROM support, NEC infrared reception, and environmental sensing.
@@ -21,7 +21,8 @@ Extended IchigoJam BASIC for Raspberry Pi Pico with a 4096-byte program area, ex
 - Improved external EEPROM handling
 - Added `IR.IN` command for NEC infrared reception
 - Added `ENV.IN` command for AHT20 + BMP280 environment sensing
-- `VER()` returns `16122` on Raspberry Pi Pico 2 / RP2350
+- Fixed `WS.LED` array access for extended arrays and added bounds checking.
+- `VER()` returns `16123` on Raspberry Pi Pico 2 / RP2350
 
 ## Memory Map
 
@@ -41,16 +42,19 @@ Extended IchigoJam BASIC for Raspberry Pi Pico with a 4096-byte program area, ex
 - Reduced internal storage slots from 100 to 25
 - Extended array variables
   - Original: `[0]..[101]`
-  - Extended: RP2040:`[102]..[357]`, RP2350:`[102]..[1125]
+  - Extended: RP2040: `[102]..[357]`, RP2350: `[102]..[1125]`
   - `VAR`  = `#800..#8CA`
-  - `VAR2` = RP2040:`#C00..#DFE`, RP2350:`#C00..#13FE`
+  - `VAR2` = RP2040: `#C00..#DFE`, RP2350: `#C00..#13FE`
 - Fixed array-related issues
   - Correct handling of extended array area
   - Fixed `FOR/NEXT` behavior with array variables
   - `CLV` / `CLEAR` now reset the extended array region
   - Added support for indirect array access `[[x]]`
+  - Fixed `WS.LED` array access to use the extended BASIC array area correctly
+  -  On the RP2350 build, up to 375 WS2812B LEDs can be driven from array elements `[0]..[1124]`
+  - `WS.LED` now reports `Index out of range` when the requested LED count exceeds the available BASIC array range.
 - Improved `FILES` command behavior
-  - `FILES` → internal storage only RP2040(`0..24`),RP2350(`0..99`)
+  - `FILES` → internal storage only RP2040(`0..24`), RP2350(`0..99`)
   - `FILES0` → internal + external EEPROM (`100..131` if detected)
   - `FILES n` → shows `0..n` and skips unused `25..99`
 - Improved external EEPROM support
@@ -60,8 +64,8 @@ Extended IchigoJam BASIC for Raspberry Pi Pico with a 4096-byte program area, ex
 - Added `IR.IN` command for HX1838-compatible NEC infrared receiver modules
 - Added `ENV.IN` command for AHT20 + BMP280 environment sensing
 - Built-in `HELP` memory map updated
-- `VER()` returns `16114` on Raspberry Pi Pico / RP2040
-- `VER()` returns `16122` on Raspberry Pi Pico 2 / RP2350
+- `VER()` returns `16115` on Raspberry Pi Pico / RP2040
+- `VER()` returns `16123` on Raspberry Pi Pico 2 / RP2350
 - Platform identification by `VER(1)`
   - Raspberry Pi Pico / RP2040: `8`
   - Raspberry Pi Pico 2 / RP2350: `9`
@@ -274,17 +278,17 @@ Then build as usual. When `IchigoJam_P.uf2` is generated, write it to the Pico.
 ## Firmware / Checksum
 
 - `IchigoJam_P.uf2`
-- `SHA-256`: `8C5F00629A0658B1B815B549B754F257A34DDB45CAFC131F4E4AB596C037569B`
-- `MD5`: `327331C46DDF7C06408C4E95AA98D395`
-- `SHA-1`: `C8544B114B293DBF27BD3738DC0F289F317FA6C4`
+- `SHA-256`: `CAEC5D43C6B2C485FFE31619B1CC472A64A82E77C53030E415C03E43CB604D6B`
+- `MD5`: `98BDA73D4EEF1A4CE3BE179E88A93098`
+- `SHA-1`: `A11FCDCB20C2FABF54DDD968EB3895AFF7537FD6`
 
 ## Raspberry Pi Pico 2 / RP2350 Firmware / Checksum
 
 - `GivetakeJam_P.uf2`
 - Write this firmware to Raspberry Pi Pico 2 / RP2350.
-- `SHA-256`: `CAC706ED6CC9CE92CA6D499A869DE295E9FE29FAA49EB567BD5944DB99ED9411`
-- `MD5`: `D9D0C516BED32174AC0C8BE658F9787A`
-- `SHA-1`: `72BC5D2693692A4ACBA0C6D8EBBEAB5597ACDB66`
+- `SHA-256`: `27FC9B9DA14D30985C53340F3B55AA07A787BF4DDAA86F7F66F3D6D64C27C20E`
+- `MD5`: `90B32450ECE56227C83CD47104B88CB1`
+- `SHA-1`: `10636FE35182C125B21CD97AE8DFCBFDD5747FCE`
 
 ## Test Programs
 
@@ -348,3 +352,4 @@ Givetakewinwin
 Created: 2026-05-29
 Updated on 2026-07-18 for Raspberry Pi Pico 2 / RP2350 HSTX DVI support.
 Updated on 2026-07-29 for Raspberry Pi Pico 2 / Array variables 1125.
+Updated on 2026-08-10 Fixed `WS.LED` array access and added bounds checking.

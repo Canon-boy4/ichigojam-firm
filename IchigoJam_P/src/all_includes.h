@@ -22,16 +22,15 @@
 #include "hardware/structs/scb.h"
 #include "hardware/i2c.h"
 
-//pico-extras
+// pico-extras
 
-#ifndef PICO_RP2350
+#if defined(PICO_RP2350) && !defined(GIVETAKEJAM_NO_SLEEP)
 #include "pico/sleep.h"
-#include "hardware/rosc.h"
 #endif
 
 //PicoDVI
 
-#ifndef PICO_RP2350
+#ifndef GIVETAKEJAM_NO_DVI
 #include "dvi.h"
 #include "common_dvi_pin_configs.h"
 #include "sprite.h"

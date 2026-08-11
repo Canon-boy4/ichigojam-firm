@@ -3,7 +3,7 @@
 
 ![Platform](https://img.shields.io/badge/platform-Raspberry%20Pi%20Pico-blue)
 ![Language](https://img.shields.io/badge/language-BASIC-orange)
-![Version](https://img.shields.io/badge/VER()-16122-brightgreen)
+![Version](https://img.shields.io/badge/VER()-16123-brightgreen)
 ![Status](https://img.shields.io/badge/status-stable-success)
 
 ## Overview / 概要
@@ -20,9 +20,11 @@ This firmware enhances program capacity, expands array variables, improves exter
 - `16100` : original base version
 - `16112` : infrared receiver build
 - `16114` : environmental measurement build
+- `16115` : fixed `WS.LED` array access for extended arrays and added bounds checking.
 - `16120` : RP2350 build supports HSTX DVI video output.
 - `16121` : RP2350 build extended arrays to `[358]..[1125]`
 - `16122` : RP2350 HSTX DVI dirty-row rendering, DRAW redraw fix, VIDEO resume redraw fix, and Japanese keyboard default when unset.
+- `16123` : RP2350 build fixed `WS.LED` array access for extended arrays and added bounds checking.
 
 ## Highlights / 主な特徴
 
