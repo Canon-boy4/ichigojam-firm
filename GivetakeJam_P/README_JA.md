@@ -208,16 +208,23 @@ make
 
 ## ４K版にするために GivetakeJam_P のディレクトリーにある以下のファイルを IchigoJam_P の各のディレクトリーに上書きコピーします。
 
-    - "IchigoJam_BASIC": basic.h , ram.h , tokens_v1.5.h
-    - "src": config.h , i2ceeprom.h , storage.h , io.h
-    - IchigoJam P の時の様にビルドして、`IchigoJam_P.uf2`ファイルが作成できたらpicoに書き込みます。
-    - IchigoJam_P.uf2: Raspberry Pi Pico / RP2040用の4K版ファームウェアファイルです。
-    - チェックサム
-      SHA-256: CAEC5D43C6B2C485FFE31619B1CC472A64A82E77C53030E415C03E43CB604D6B
-      MD5: 98BDA73D4EEF1A4CE3BE179E88A93098
-      SHA-1: A11FCDCB20C2FABF54DDD968EB3895AFF7537FD6
+- `IchigoJam_BASIC`
+  - `basic.h`
+  - `ram.h`
+  - `tokens_v1.5.h`
+- `src`
+  - `config.h`
+  - `i2ceeprom.h`
+  - `storage.h`
+  - `io.h`
+- IchigoJam P の時の様にビルドして、`IchigoJam_P.uf2`ファイルが作成できたらPicoに書き込みます。
+- `IchigoJam_P.uf2`: Raspberry Pi Pico / RP2040用の4K版ファームウェアファイルです。
+- チェックサム
+  - SHA-256: `CAEC5D43C6B2C485FFE31619B1CC472A64A82E77C53030E415C03E43CB604D6B`
+  - MD5: `98BDA73D4EEF1A4CE3BE179E88A93098`
+  - SHA-1: `A11FCDCB20C2FABF54DDD968EB3895AFF7537FD6`
 
-    - ARRAY_VAR_TOTAL_TEST.BAS: 配列変数のテストプログラムです。このテストが ALL OK で通ることを確認しています。
+- `ARRAY_VAR_TOTAL_TEST.BAS`: 配列変数のテストプログラムです。このテストが ALL OK で通ることを確認しています。
 
 ## Raspberry Pi Pico 2 / RP2350 4K版ファームウェア
 
@@ -269,9 +276,11 @@ make
 - IR受信を安定させるため、BASIC側で repeat 除外を推奨します
 
 ギブテクウインウイン
-2026/5/29 作成
-2026/7/18 Pico 2 / RP2350 HSTX DVI版を追加
-2026/7/29 Pico 2 配列変数を 1125 まで増加
-2026/8/10 `WS.LED` の拡張配列変数へのアクセスと上限チェックを修正
+
+- 2026/5/29 作成
+- 2026/7/18 Pico 2 / RP2350 HSTX DVI版を追加
+- 2026/7/29 Pico 2 配列変数を 1125 まで増加
+- 2026/8/10 `WS.LED` の拡張配列変数へのアクセスと上限チェックを修正
+
 ![Release](https://img.shields.io/github/v/release/IchigoJam/ichigojam-firm)
 ![Downloads](https://img.shields.io/github/downloads/IchigoJam/ichigojam-firm/total)

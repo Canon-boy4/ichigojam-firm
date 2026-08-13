@@ -15,7 +15,7 @@ Extended IchigoJam BASIC for Raspberry Pi Pico with a 4096-byte program area, ex
 - Internal flash storage slots
   - Raspberry Pi Pico / RP2040: 25 slots
   - Raspberry Pi Pico 2 / RP2350: 100 slots
-- Array variables expanded from `[0]..[101]` to RP2040:`[0]..[357]`, RP2350:`[0]..[1125]
+- Array variables expanded from `[0]..[101]` to RP2040:`[0]..[357]`, RP2350:`[0]..[1125]`
 - Added `VAR2` area at `#C00`
 - LIST area moved to RP2040:`#E00`, RP2350:`#1400`
 - Improved external EEPROM handling
@@ -278,9 +278,9 @@ Then build as usual. When `IchigoJam_P.uf2` is generated, write it to the Pico.
 ## Firmware / Checksum
 
 - `IchigoJam_P.uf2`
-- `SHA-256`: `CAEC5D43C6B2C485FFE31619B1CC472A64A82E77C53030E415C03E43CB604D6B`
-- `MD5`: `98BDA73D4EEF1A4CE3BE179E88A93098`
-- `SHA-1`: `A11FCDCB20C2FABF54DDD968EB3895AFF7537FD6`
+  - `SHA-256`: `CAEC5D43C6B2C485FFE31619B1CC472A64A82E77C53030E415C03E43CB604D6B`
+  - `MD5`: `98BDA73D4EEF1A4CE3BE179E88A93098`
+  - `SHA-1`: `A11FCDCB20C2FABF54DDD968EB3895AFF7537FD6`
 
 ## Raspberry Pi Pico 2 / RP2350 Firmware / Checksum
 
@@ -348,8 +348,9 @@ A license is required for redistribution to third parties.
 
 ---
 
-Givetakewinwin  
-Created: 2026-05-29
-Updated on 2026-07-18 for Raspberry Pi Pico 2 / RP2350 HSTX DVI support.
-Updated on 2026-07-29 for Raspberry Pi Pico 2 / Array variables 1125.
-Updated on 2026-08-10 Fixed `WS.LED` array access and added bounds checking.
+Givetakewinwin
+
+- Created: 2026-05-29
+- Updated on 2026-07-18 for Raspberry Pi Pico 2 / RP2350 HSTX DVI support.
+- Updated on 2026-07-29 for Raspberry Pi Pico 2 / Array variables 1125.
+- Updated on 2026-08-10: Fixed `WS.LED` array access and added bounds checking.
