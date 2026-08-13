@@ -84,6 +84,87 @@ const uint8 *pvram;
 #ifdef PICO_RP2350
 static uint32_t screen_dirty_rows;
 
+#define SCREEN_ATTR_SIZE (32 * 24)
+
+// RP2350 HSTX DVI text color attribute.
+// 1 byte per character:
+//   bit 0..3 : foreground color 0..15
+//   bit 4..7 : background color 0..15
+static uint8 screen_attr[SCREEN_ATTR_SIZE];
+static uint8 screen_color_fg = 15;
+static uint8 screen_color_bg = 1;
+static uint8 screen_color_border = 1;
+
+S_INLINE uint8 screen_make_attr(uint8 fg, uint8 bg)
+{
+	return (fg & 15) | ((bg & 15) << 4);
+}
+
+S_INLINE uint8 screen_current_attr(void)
+{
+	return screen_make_attr(screen_color_fg, screen_color_bg);
+}
+
+S_INLINE void screen_attr_fill(uint8 attr)
+{
+	for (int i = 0; i < SCREEN_ATTR_SIZE; i++) {
+		screen_attr[i] = attr;
+	}
+}
+
+S_INLINE void screen_attr_fill_current(void)
+{
+	screen_attr_fill(screen_current_attr());
+}
+
+S_INLINE void screen_attr_fill_range(int start, int len)
+{
+	uint8 attr = screen_current_attr();
+
+	if (start < 0) {
+		len += start;
+		start = 0;
+	}
+	if (start >= SCREEN_ATTR_SIZE || len <= 0) {
+		return;
+	}
+	if (start + len > SCREEN_ATTR_SIZE) {
+		len = SCREEN_ATTR_SIZE - start;
+	}
+
+	for (int i = 0; i < len; i++) {
+		screen_attr[start + i] = attr;
+	}
+}
+
+S_INLINE void screen_attr_copy_cell(int dst, int src)
+{
+	if (0 <= dst && dst < SCREEN_ATTR_SIZE &&
+		0 <= src && src < SCREEN_ATTR_SIZE) {
+		screen_attr[dst] = screen_attr[src];
+	}
+}
+
+S_INLINE void screen_attr_set_cell(int pos)
+{
+	if (0 <= pos && pos < SCREEN_ATTR_SIZE) {
+		screen_attr[pos] = screen_current_attr();
+	}
+}
+
+S_INLINE void screen_set_color(int fg, int bg, int border)
+{
+	if (0 <= fg) {
+		screen_color_fg = fg & 15;
+	}
+	if (0 <= bg) {
+		screen_color_bg = bg & 15;
+	}
+	if (0 <= border) {
+		screen_color_border = border & 15;
+	}
+}
+
 S_INLINE void screen_dirty_all(void)
 {
 	screen_dirty_rows = (1u << SCREEN_H) - 1u;
@@ -122,6 +203,12 @@ S_INLINE void screen_dirty_clear_all(void)
 #define screen_dirty_test(y) 1
 #define screen_dirty_clear_row(y)
 #define screen_dirty_clear_all()
+#define screen_attr_fill(attr)
+#define screen_attr_fill_current()
+#define screen_attr_fill_range(start, len)
+#define screen_attr_copy_cell(dst, src)
+#define screen_attr_set_cell(pos)
+#define screen_set_color(fg, bg, border)
 #endif
 
 volatile uint16 frames;
@@ -338,6 +425,7 @@ INLINE void screen_clear() {
 	vram = (uint8*)(ram + OFFSET_RAM_VRAM);
 	_g.cursorx = _g.cursory = 0;
 	memclear4(vram, SCREEN_W * SCREEN_H);
+	screen_attr_fill_current();
 	screen_dirty_all();
 //	if (_g.uartmode == 2) {
 //	if (_g.uartmode & 2) { // 1.2b62
@@ -362,37 +450,56 @@ void screen_scroll(int n) {
 			*/
 			memcpy4(vram, vram + SCREEN_W, SCREEN_W * (SCREEN_H - 1)); // ok
 			memclear4(vram + (SCREEN_H - 1) * SCREEN_W, SCREEN_W);
+#ifdef PICO_RP2350
+			memcpy4(screen_attr, screen_attr + SCREEN_W, SCREEN_W * (SCREEN_H - 1));
+			screen_attr_fill_range((SCREEN_H - 1) * SCREEN_W, SCREEN_W);
+#endif
 			break;
 		case 1:
 			n = 29;
 		case 29: // RIGHT
 			for (int i = SCREEN_W - 2; i >= 0; i--) {
-				for (int j = 0; j < SCREEN_H; j++)
-					vram[j * SCREEN_W + (i + 1)] = vram[j * SCREEN_W + i];
+				for (int j = 0; j < SCREEN_H; j++) {
+					int dst = j * SCREEN_W + (i + 1);
+					int src = j * SCREEN_W + i;
+					vram[dst] = vram[src];
+					screen_attr_copy_cell(dst, src);
+				}
 			}
-			for (int j = 0; j < SCREEN_H; j++)
-				vram[j * SCREEN_W] = 0;
+			for (int j = 0; j < SCREEN_H; j++) {
+				int pos = j * SCREEN_W;
+				vram[pos] = 0;
+				screen_attr_set_cell(pos);
+			}
 			break;
 		case 2:
 			n = 31;
 		case 31: // DOWN
 			for (int i = SCREEN_H - 2; i >= 0; i--) {
 				memcpy4(vram + (i + 1) * SCREEN_W, vram + i * SCREEN_W, SCREEN_W);
-//				for (int j = 0; j < SCREEN_W; j++)
-//					vram[(i + 1) * SCREEN_W + j] = vram[i * SCREEN_W + j];
+#ifdef PICO_RP2350
+				memcpy4(screen_attr + (i + 1) * SCREEN_W, screen_attr + i * SCREEN_W, SCREEN_W);
+#endif
 			}
-		//	memcpy(vram + SCREEN_W, vram, SCREEN_W * (SCREEN_H - 1)); // NG
 			memclear4(vram, SCREEN_W);
+			screen_attr_fill_range(0, SCREEN_W);
 			break;
 		case 3:
 			n = 28;
 		case 28: // LEFT
 			for (int i = 1; i < SCREEN_W; i++) {
-				for (int j = 0; j < SCREEN_H; j++)
-					vram[j * SCREEN_W + (i - 1)] = vram[j * SCREEN_W + i];
+				for (int j = 0; j < SCREEN_H; j++) {
+					int dst = j * SCREEN_W + (i - 1);
+					int src = j * SCREEN_W + i;
+					vram[dst] = vram[src];
+					screen_attr_copy_cell(dst, src);
+				}
 			}
-			for (int j = 0; j < SCREEN_H; j++)
-				vram[j * SCREEN_W + (SCREEN_W - 1)] = 0;
+			for (int j = 0; j < SCREEN_H; j++) {
+				int pos = j * SCREEN_W + (SCREEN_W - 1);
+				vram[pos] = 0;
+				screen_attr_set_cell(pos);
+			}
 			break;
 		default:
 			return;
@@ -504,6 +611,8 @@ static void screen_putc(char c) {
 		}
 		_g.screen_locatemode--;
 		_g.uartmode_txd = bk;
+		screen_dirty_row(dirty_y_before);
+		screen_dirty_row(_g.cursory);
 		return;
 	}
 	if (_g.cursory == -1)
@@ -574,6 +683,7 @@ static void screen_putc(char c) {
 				break;
 			}
 			vram[i] = vram[i + 1];
+			screen_attr_copy_cell(i, i + 1);
 		}
 	} else if (c == 28) { // left // b13で上書きモード時自由移動
 		if (_g.cursorx > 0) {
@@ -640,6 +750,7 @@ static void screen_putc(char c) {
 	} else if (c == 12) { // 0x0c 書式送り カーソル位置以降削除
 		int now = _g.cursory * SCREEN_W + _g.cursorx;
 		memclear(vram + now, SCREEN_W * SCREEN_H - now);
+		screen_attr_fill_range(now, SCREEN_W * SCREEN_H - now);
 		screen_dirty_all();
 	} else if (c == 0x12) { // home
 		int now = _g.cursory * SCREEN_W + _g.cursorx;
@@ -662,6 +773,7 @@ static void screen_putc(char c) {
 		_g.cursory = now / SCREEN_W;
 	} else if (c == 0x13) { // page up
 		_g.cursorx = _g.cursory = 0;
+		screen_dirty_all();
 	} else if (c == 0x14) { // page down
 		_g.cursorx = 0;
 		_g.cursory = SCREEN_H - 1;
@@ -705,8 +817,10 @@ static void screen_putc(char c) {
 			}
 			for (int i = cxlast - 1; i >= now; i--) {
 				vram[i + 1] = vram[i];
+				screen_attr_copy_cell(i + 1, i);
 			}
 			vram[now] = c;
+			screen_attr_set_cell(now);
 			_g.cursorx++;
 			if (now == cxlast) {
 				if (_g.cursorx == SCREEN_W) {
@@ -735,7 +849,9 @@ static void screen_putc(char c) {
 				}
 			}
 		} else { // overwrite mode
-			vram[_g.cursory * SCREEN_W + _g.cursorx] = c;
+			int now = _g.cursory * SCREEN_W + _g.cursorx;
+			vram[now] = c;
+			screen_attr_set_cell(now);
 			_g.cursorx++;
 			if (_g.cursorx == SCREEN_W)
 				screen_enter();

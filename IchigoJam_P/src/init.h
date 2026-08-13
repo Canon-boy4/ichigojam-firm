@@ -127,8 +127,26 @@ void vram_to_framebuf_all(bool visible_cursor) {
 
 #ifdef PICO_RP2350
 
-#define HSTX_BG_COLOUR 0x00
-#define HSTX_FG_COLOUR 0xFF
+// MSX風 16色パレットをRGB332へ変換した値。
+// RGB332: bit7..5=R, bit4..2=G, bit1..0=B
+static const uint8_t hstx_msx_color_rgb332[16] = {
+	0x00, //  0 transparent -> black
+	0x00, //  1 black
+	0x38, //  2 green
+	0x7D, //  3 light green
+	0x27, //  4 dark blue
+	0x4F, //  5 light blue
+	0xA4, //  6 dark red
+	0x5B, //  7 cyan
+	0xE4, //  8 red
+	0xED, //  9 light red
+	0xD8, // 10 yellow
+	0xDA, // 11 light yellow
+	0x30, // 12 dark green
+	0xCA, // 13 magenta
+	0xB6, // 14 gray
+	0xFF  // 15 white
+};
 
 void vram_to_hstx_row(int vram_y, bool visible_cursor) {
     const int mag = 1 << _g.screen_big;
@@ -153,7 +171,11 @@ void vram_to_hstx_row(int vram_y, bool visible_cursor) {
             ];
 
             for (int vram_x = 0; vram_x < SCREEN_W; vram_x++) {
-                uint8_t ch = vram[vram_y * SCREEN_W + vram_x];
+                int vram_pos = vram_y * SCREEN_W + vram_x;
+                uint8_t ch = vram[vram_pos];
+                uint8_t attr = screen_attr[vram_pos];
+                uint8_t fg_colour = hstx_msx_color_rgb332[attr & 15];
+                uint8_t bg_colour = hstx_msx_color_rgb332[(attr >> 4) & 15];
 
                 uint8_t char_line =
                     CHAR_PATTERN[ch * FONT_SIZE + font_y];
@@ -180,9 +202,9 @@ void vram_to_hstx_row(int vram_y, bool visible_cursor) {
                 // フォント1行の8ドットを、横方向へdot_size倍に展開する。
                 for (int font_x = 0; font_x < FONT_SIZE; font_x++) {
                     uint8_t colour =
-                        ((char_line >> (7 - font_x)) & 1)
-                        ? HSTX_FG_COLOUR
-                        : HSTX_BG_COLOUR;
+                    ((char_line >> (7 - font_x)) & 1)
+                    ? fg_colour
+                    : bg_colour;
 
                     for (int repeat_x = 0; repeat_x < dot_size; repeat_x++) {
                         *dst++ = colour;
