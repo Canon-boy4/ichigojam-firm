@@ -130,20 +130,20 @@ void vram_to_framebuf_all(bool visible_cursor) {
 // MSX風 16色パレットをRGB332へ変換した値。
 // RGB332: bit7..5=R, bit4..2=G, bit1..0=B
 static const uint8_t hstx_msx_color_rgb332[16] = {
-	0x00, //  0 transparent -> black
-	0x00, //  1 black
-	0x38, //  2 green
-	0x7D, //  3 light green
-	0x27, //  4 dark blue
-	0x4F, //  5 light blue
-	0xA4, //  6 dark red
-	0x5B, //  7 cyan
-	0xE4, //  8 red
-	0xED, //  9 light red
-	0xD8, // 10 yellow
-	0xDA, // 11 light yellow
-	0x30, // 12 dark green
-	0xCA, // 13 magenta
+	0x00, // 0 transparent -> black
+	0x00, // 1 black
+	0x1C, // 2 green
+	0x7C, // 3 light green
+	0x03, // 4 dark blue
+	0x1F, // 5 light blue
+	0x80, // 6 dark red
+	0x1F, // 7 cyan
+	0xE0, // 8 red
+	0xF8, // 9 light red
+	0xFC, // 10 yellow
+	0xFE, // 11 light yellow
+	0x10, // 12 dark green
+	0xE3, // 13 magenta
 	0xB6, // 14 gray
 	0xFF  // 15 white
 };

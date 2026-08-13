@@ -444,6 +444,7 @@ S_INLINE void command_play();
 S_INLINE void command_beep(); // S_INLINEで4増
 S_INLINE void command_tempo();
 S_INLINE void command_video();
+S_INLINE void command_color();
 S_INLINE void command_scroll();
 S_INLINE void command_clp();
 S_INLINE void command_poke();
@@ -752,6 +753,9 @@ int basic_execute(char *commandline)
 			break;
 		case TOKEN_VIDEO:
 			command_video();
+			break;
+		case TOKEN_COLOR:
+			command_color();
 			break;
 			// 76
 
@@ -3782,6 +3786,39 @@ S_INLINE void command_video()
 	{
 		video_off(clkdiv);
 	}
+}
+S_INLINE void command_color()
+{
+	int16 color[3];
+	int i;
+
+	color[0] = token_expression();
+	IJB_ERR_CHK();
+	color[1] = -1;
+	color[2] = -1;
+
+	for (i = 1; i < 3; i++)
+	{
+		int code = token_getCode();
+		if (code != TOKEN_COMMA)
+		{
+			break;
+		}
+
+		color[i] = token_expression();
+		IJB_ERR_CHK();
+	}
+
+	token_end();
+
+	if (color[0] < 0 || color[0] > 15 ||
+		color[1] > 15 ||
+		color[2] > 15) {
+		command_error(ERR_INDEX_OUT_OF_RANGE);
+		return;
+	}
+
+	screen_set_color(color[0], color[1], color[2]);
 }
 S_INLINE void command_scroll()
 {
