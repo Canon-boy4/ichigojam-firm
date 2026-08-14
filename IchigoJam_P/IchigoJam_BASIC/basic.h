@@ -1680,7 +1680,7 @@ static int16 token_expression5()
 		int n = token_opt1();
 		if (n == 0)
 #ifdef PICO_RP2350
-			return IJB_VER * 100 + IJB_BUILD + 23; // Pico 2 / RP2350版識別用: VER() = 16123
+			return IJB_VER * 100 + IJB_BUILD + 24; // Pico 2 / RP2350版識別用: VER() = 16124
 #else
 			return IJB_VER * 100 + IJB_BUILD + 15; // Pico / RP2040版識別用: VER() = 16115
 #endif
@@ -3787,6 +3787,22 @@ S_INLINE void command_video()
 		video_off(clkdiv);
 	}
 }
+
+// ===== MODIFIED (Givetake BASIC) =====
+// MSX風 COLOR 命令。
+// 書式:
+//   COLOR f
+//   COLOR f,b
+//   COLOR f,b,c
+//
+// f: 前景色 0..15
+// b: 背景色 0..15
+// c: 周辺色 0..15
+//
+// token_option1() はオプション引数1個分を読む用途のため、
+// COLOR f,b,c のような3引数形式では DRAW と同じく token_getCode() で
+// カンマを確認しながら最大3個の式を読む。
+// 先頭省略形式 COLOR ,b や COLOR ,,c は現時点では未対応。
 S_INLINE void command_color()
 {
 	int16 color[3];

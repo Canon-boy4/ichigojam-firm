@@ -3,7 +3,7 @@
 ![Platform](https://img.shields.io/badge/platform-Raspberry%20Pi%20Pico-blue)
 ![Language](https://img.shields.io/badge/language-BASIC-orange)
 ![License](https://img.shields.io/badge/license-IchigoJam-green)
-![Version](https://img.shields.io/badge/version-16123-brightgreen)
+![Version](https://img.shields.io/badge/version-16124-brightgreen)
 ![Status](https://img.shields.io/badge/status-stable-success)
 
 ## プログラム容量の拡張、配列変数の拡張、外部EEPROM対応の改善、NEC方式の赤外線受信コマンド、環境測定コマンドの追加を行い、従来のIchigoJam P BASICの互換性を維持しながら機能強化しています。
@@ -112,6 +112,24 @@ Pico 2 / RP2350版では、増加RAMを利用して配列変数領域 VAR2 を�
   - Pico 2 HSTX DVIビルドでは、HSTX表示にDMAチャネル0/1を使用します。
   - RP2350版`IR.IN`のPIO DMAはDMAチャネル10を使用するため、HSTX表示用DMAとは競合しません。
 
+- RP2350 / Pico 2 HSTX DVI テキスト出力向けに、MSX風の `COLOR f[,b[,c]]` 命令を追加
+  - `f`: 前景色 0〜15
+  - `b`: 背景色 0〜15
+  - `c`: 周辺色 0〜15
+  - 現在の実装では、以後に表示する文字と `CLS` に反映されます。既に表示済みの文字色は変更しません。
+
+使用例:
+
+```basic
+CLS
+COLOR 15,1,1
+?"WHITE"
+COLOR 10,1,1
+?"YELLOW"
+COLOR 8,1,1
+?"RED"
+```
+
 - AHT20とBMP280モジュールを使って温湿度と気圧を測定するコマンド ENV.IN を追加
   - 書式
     ```sh
@@ -138,7 +156,7 @@ Pico 2 / RP2350版では、増加RAMを利用して配列変数領域 VAR2 を�
 
 - 拡張版識別のため `VER()` を変更
   - Raspberry Pi Pico / RP2040版: `16115`
-  - Raspberry Pi Pico 2 / RP2350版: `16123`
+  - Raspberry Pi Pico 2 / RP2350版: `16124`
 
   使用例 BASIC
 
@@ -153,7 +171,7 @@ Pico 2 / RP2350版では、増加RAMを利用して配列変数領域 VAR2 を�
   Raspberry Pi Pico 2 / RP2350版:
   ```sh
   ? VER()
-  16123
+  16124
   ? VER(1)
   9
   ```
@@ -161,6 +179,8 @@ Pico 2 / RP2350版では、増加RAMを利用して配列変数領域 VAR2 を�
 - `VER(1)` によるプラットフォーム識別
   - Raspberry Pi Pico / RP2040版: `8`
   - Raspberry Pi Pico 2 / RP2350版: `9`
+
+- `ARRAY_VAR_TOTAL_TEST.BAS`: 配列変数のテストプログラムです。このテストが ALL OK で通ることを確認しています。
 ---
 
 #  IchigoJam P BASICのソースコードを変更して４K版にしたものです。よって、まずはIchigoJam P BASICがコンパイルできる環境を作成します。
@@ -169,7 +189,7 @@ Pico 2 / RP2350版では、増加RAMを利用して配列変数領域 VAR2 を�
 - "CMake"と"GCC"をインストールする
 
 ## IchigoJam_P のコンパイル環境
-　　-  IchigoJam_P のディレクトリーで作成します。
+- IchigoJam_P のディレクトリーで作成します。
 
 - 以下のライブラリを`IchigoJam_P`ディレクトリ直下に置く
     - "IchigoJam_BASIC": 1つ上の階層にある`IchigoJam_BASIC`ディレクトリをコピーする
@@ -218,21 +238,20 @@ make
   - `storage.h`
   - `io.h`
 - IchigoJam P の時の様にビルドして、`IchigoJam_P.uf2`ファイルが作成できたらPicoに書き込みます。
-- `IchigoJam_P.uf2`: Raspberry Pi Pico / RP2040用の4K版ファームウェアファイルです。
-- チェックサム
+
+## Raspberry Pi Pico / RP2040 Firmware / Checksum
+### Raspberry Pi Pico / RP2040用の4K版ファームウェアファイルです。
+- `IchigoJam_P.uf2`
   - SHA-256: `CAEC5D43C6B2C485FFE31619B1CC472A64A82E77C53030E415C03E43CB604D6B`
   - MD5: `98BDA73D4EEF1A4CE3BE179E88A93098`
   - SHA-1: `A11FCDCB20C2FABF54DDD968EB3895AFF7537FD6`
 
-- `ARRAY_VAR_TOTAL_TEST.BAS`: 配列変数のテストプログラムです。このテストが ALL OK で通ることを確認しています。
-
-## Raspberry Pi Pico 2 / RP2350 4K版ファームウェア
-
-- `GivetakeJam_P.uf2`: Raspberry Pi Pico 2 / RP2350用の4K版ファームウェアファイルです。
-- チェックサム
-  - SHA-256: `27FC9B9DA14D30985C53340F3B55AA07A787BF4DDAA86F7F66F3D6D64C27C20E`
-  - MD5: `90B32450ECE56227C83CD47104B88CB1`
-  - SHA-1: `10636FE35182C125B21CD97AE8DFCBFDD5747FCE`
+## Raspberry Pi Pico 2 / RP23500 Firmware / Checksum
+### Raspberry Pi Pico 2 / RP2350用の4K版ファームウェアファイルです。
+- `GivetakeJam_P.uf2`
+  - SHA-256: `957883406A068C553708B3829337DE71A38213B1E2C342FF8B3439CA481A9D91`
+  - MD5: `054450F11C4857C4F008643B7DDAD7F1`
+  - SHA-1: `EDA776EB7D51E19A2E03DE18BA171DBD2CF82BC4`
 
 ## Screenshot
 
@@ -281,6 +300,7 @@ make
 - 2026/7/18 Pico 2 / RP2350 HSTX DVI版を追加
 - 2026/7/29 Pico 2 配列変数を 1125 まで増加
 - 2026/8/10 `WS.LED` の拡張配列変数へのアクセスと上限チェックを修正
+- 2026/8/14 Pico 2 / RP2350 HSTX DVI テキスト出力向けに MSX風 `COLOR` 命令を追加
 
 ![Release](https://img.shields.io/github/v/release/IchigoJam/ichigojam-firm)
 ![Downloads](https://img.shields.io/github/downloads/IchigoJam/ichigojam-firm/total)
