@@ -84,6 +84,17 @@ const uint8 *pvram;
 #ifdef PICO_RP2350
 static uint32_t screen_dirty_rows;
 
+// ===== MODIFIED (Givetake BASIC / RP2350 HSTX DVI) =====
+// RP2350 HSTX DVI表示用のテキストカラー属性VRAM。
+// 通常のVRAMは文字コードのみを保持するため、文字ごとの前景色・背景色を
+// 別バッファ screen_attr[] に保持する。
+// 属性は1バイトで、下位4bitを前景色、上位4bitを背景色として扱う。
+//   bit0..3 : foreground color 0..15
+//   bit4..7 : background color 0..15
+//
+// この実装はRP2350 HSTX DVI表示向けで、RP2040側では空マクロにして
+// 既存のPicoDVI表示処理へ影響を与えない。
+
 #define SCREEN_ATTR_SIZE (32 * 24)
 
 // RP2350 HSTX DVI text color attribute.
@@ -152,6 +163,15 @@ S_INLINE void screen_attr_set_cell(int pos)
 	}
 }
 
+// COLOR命令で設定された現在色を保持する。
+// fg/bg/border に負数を渡した場合は、その要素を変更しない。
+// 例:
+//   COLOR 15      -> 前景色のみ変更
+//   COLOR 15,1    -> 前景色・背景色を変更
+//   COLOR 15,1,1  -> 前景色・背景色・周辺色を変更
+//
+// borderは周辺色として保持するが、現時点では表示への完全反映は
+// 今後の調整対象とする。
 S_INLINE void screen_set_color(int fg, int bg, int border)
 {
 	if (0 <= fg) {
@@ -425,6 +445,8 @@ INLINE void screen_clear() {
 	vram = (uint8*)(ram + OFFSET_RAM_VRAM);
 	_g.cursorx = _g.cursory = 0;
 	memclear4(vram, SCREEN_W * SCREEN_H);
+	// CLS時は画面全体を現在のCOLOR設定で初期化する。
+	// これにより COLOR f,b 後の CLS で背景色が反映される。
 	screen_attr_fill_current();
 	screen_dirty_all();
 //	if (_g.uartmode == 2) {
@@ -820,6 +842,8 @@ static void screen_putc(char c) {
 				screen_attr_copy_cell(i + 1, i);
 			}
 			vram[now] = c;
+			// 新しく表示する文字には、現在のCOLOR設定を属性として付与する。
+			// 既に表示済みの文字はCOLOR変更だけでは再着色しない。
 			screen_attr_set_cell(now);
 			_g.cursorx++;
 			if (now == cxlast) {

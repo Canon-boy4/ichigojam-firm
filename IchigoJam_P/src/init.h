@@ -127,8 +127,18 @@ void vram_to_framebuf_all(bool visible_cursor) {
 
 #ifdef PICO_RP2350
 
-// MSX風 16色パレットをRGB332へ変換した値。
-// RGB332: bit7..5=R, bit4..2=G, bit1..0=B
+// ===== MODIFIED (Givetake BASIC / RP2350 HSTX DVI) =====
+// COLOR命令用のMSX風16色パレット。
+// HSTX DVIフレームバッファはRGB332形式で扱うため、MSXの色番号0..15を
+// RGB332値へ変換する。
+// 色味はHSTX DVI出力、抵抗DAC、接続モニタの補正により見え方が変わるため、
+// 黄色系などは実機表示を見ながら調整する。
+//
+// MSX風色番号:
+//   0:透明扱い, 1:黒, 2:緑, 3:明るい緑,
+//   4:暗い青, 5:明るい青, 6:暗い赤, 7:水色,
+//   8:赤, 9:明るい赤, 10:黄色, 11:明るい黄色,
+//   12:暗い緑, 13:紫, 14:灰色, 15:白
 static const uint8_t hstx_msx_color_rgb332[16] = {
 	0x00, // 0 transparent -> black
 	0x00, // 1 black
@@ -173,6 +183,8 @@ void vram_to_hstx_row(int vram_y, bool visible_cursor) {
             for (int vram_x = 0; vram_x < SCREEN_W; vram_x++) {
                 int vram_pos = vram_y * SCREEN_W + vram_x;
                 uint8_t ch = vram[vram_pos];
+                // 文字VRAMの各セルに対応する属性VRAMから前景色・背景色を取得し、
+                // フォントビットが1なら前景色、0なら背景色でピクセルを生成する。
                 uint8_t attr = screen_attr[vram_pos];
                 uint8_t fg_colour = hstx_msx_color_rgb332[attr & 15];
                 uint8_t bg_colour = hstx_msx_color_rgb332[(attr >> 4) & 15];

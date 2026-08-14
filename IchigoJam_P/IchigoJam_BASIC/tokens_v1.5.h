@@ -2,6 +2,10 @@
 
 // ===== MODIFIED (Givetake BASIC) =====
 // IR.IN, ENV.IN, COLOR を追加したのでトークン数を 132+3
+// VERSION15用トークン数。
+// N_TOKEN_OFFSET が basic.h 側で 4 に設定されているため、
+// 実際の終端判定は N_TOKEN + N_TOKEN_OFFSET で行われる。
+// TOKEN_SEMICOLON 138 まで使う現在の構成では N_TOKEN は 135。
 #define N_TOKEN 135
 #define TOKEN_NULL 0
 #define TOKEN_VAR 1
@@ -145,6 +149,12 @@
 // 書式: ENV.IN [0]
 #define TOKEN_ENV_IN 131
 
+// ===== MODIFIED (Givetake BASIC) =====
+// RP2350 HSTX DVI テキストカラー用に MSX風 COLOR 命令を追加。
+// COLOR は文として実行する命令なので、関数トークン CHR$ より前に配置する。
+// ここに追加したため、以降の CHR$ / STR$ / DEC$ / HEX$ / BIN$ / ; の
+// トークン番号は1つ後ろへずれる。
+#define TOKEN_COLOR 132
 // ===== MODIFIED (Givetake BASIC) =====
 // MSX風 COLOR コマンド
 // 書式: COLOR f[,b[,c]]

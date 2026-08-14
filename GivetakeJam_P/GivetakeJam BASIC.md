@@ -3,7 +3,7 @@
 
 ![Platform](https://img.shields.io/badge/platform-Raspberry%20Pi%20Pico-blue)
 ![Language](https://img.shields.io/badge/language-BASIC-orange)
-![Version](https://img.shields.io/badge/VER()-16123-brightgreen)
+![Version](https://img.shields.io/badge/VER()-16124-brightgreen)
 ![Status](https://img.shields.io/badge/status-stable-success)
 
 ## Overview / 概要
@@ -25,6 +25,7 @@ This firmware enhances program capacity, expands array variables, improves exter
 - `16121` : RP2350 build extended arrays to `[358]..[1125]`
 - `16122` : RP2350 HSTX DVI dirty-row rendering, DRAW redraw fix, VIDEO resume redraw fix, and Japanese keyboard default when unset.
 - `16123` : RP2350 build fixed `WS.LED` array access for extended arrays and added bounds checking.
+- `16124` : RP2350 build added MSX-style `COLOR f[,b[,c]]` command for HSTX DVI text output.
 
 ## Highlights / 主な特徴
 
@@ -35,6 +36,7 @@ This firmware enhances program capacity, expands array variables, improves exter
 - `LIST` area at RP2040:`#E00`, RP2350:`#1400`
 - `IR.IN` NEC infrared receiver command
 - `ENV.IN` AHT20 + BMP280 environment sensor command
+- `COLOR` MSX-style text color command for RP2350 HSTX DVI output
 - External EEPROM support (`24LC64` / `24LC256` / `24FC1025`)
 - RP2350 build: default keyboard layout is Japanese when the keyboard setting flash area is unset.
 
