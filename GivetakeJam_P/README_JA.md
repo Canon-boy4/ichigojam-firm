@@ -6,7 +6,7 @@
 ![Version](https://img.shields.io/badge/version-16124-brightgreen)
 ![Status](https://img.shields.io/badge/status-stable-success)
 
-## プログラム容量の拡張、配列変数の拡張、外部EEPROM対応の改善、NEC方式の赤外線受信コマンド、環境測定コマンドの追加を行い、従来のIchigoJam P BASICの互換性を維持しながら機能強化しています。
+## プログラム容量の拡張、配列変数の拡張、外部EEPROM対応の改善、NEC方式の赤外線受信コマンド、環境測定コマンド、カラー表示コマンドの追加を行い、従来のIchigoJam P BASICの互換性を維持しながら機能強化しています。
 ### Pico 2 / RP2350版の配列領域拡張
 Pico 2 / RP2350版では、増加RAMを利用して配列変数領域 VAR2 を拡張しています。
 
@@ -180,7 +180,6 @@ COLOR 8,1,1
   - Raspberry Pi Pico / RP2040版: `8`
   - Raspberry Pi Pico 2 / RP2350版: `9`
 
-- `ARRAY_VAR_TOTAL_TEST.BAS`: 配列変数のテストプログラムです。このテストが ALL OK で通ることを確認しています。
 ---
 
 #  IchigoJam P BASICのソースコードを変更して４K版にしたものです。よって、まずはIchigoJam P BASICがコンパイルできる環境を作成します。
@@ -253,19 +252,36 @@ make
   - MD5: `054450F11C4857C4F008643B7DDAD7F1`
   - SHA-1: `EDA776EB7D51E19A2E03DE18BA171DBD2CF82BC4`
 
+## Test Programs
+
+- `ARRAY_VAR_TOTAL_TEST.BAS`
+  - 配列変数のテストプログラムです。このテストが ALL OK で通ることを確認しています。
+- `IR_IN_TEST.BAS`
+  - NEC方式の赤外線受信のテストプログラムです。
+- `ENV_IN_TEST.BAS`
+  - AHT20 + BMP280 環境測定のテストプログラムです。
+- `ICHIGO_EATER_COLOR.BAS`
+  - COLOR コマンドを使った BASIC ゲームです。
+
+
 ## Screenshot
 
 ### 動作環境
 
-![screenshot](./docs/IMG_2095up.png)
+![screenshot](./docs/IMG_4677up.png)
 
 ### 表示画面 ( 名称, HELP表示：メモリマップ, FILES表示 )
 
-![screenshot](./docs/IMG_2159up.png)
+![screenshot](./docs/IMG_4679up.png)
 
-### IchigoJam_P 互換基板 ( MECHTARIAT PJ 凸 )
+### IchigoJam_P 互換基板 ( GivetakeJam-P )
 
-![screenshot](./docs/IMG_2168up.png)
+![screenshot](./docs/IMG_4684up.png)
+
+### COLOR コマンド使用画面 ( ICHIGO EATER COLOR画面 )
+
+![screenshot](./docs/IMG_4685up.png)
+![screenshot](./docs/IMG_4690up.png)
 
 ## ライセンス / license
 

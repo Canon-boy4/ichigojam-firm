@@ -55,13 +55,17 @@ This firmware enhances program capacity, expands array variables, improves exter
 ## Screenshots / スクリーンショット
 
 ### Runtime Environment
-![Runtime Environment](./docs/IMG_2095up.png)
+![Runtime Environment](./docs/IMG_4677up.png)
 
 ### Display Examples
-![Display Examples](./docs/IMG_2159up.png)
+![Display Examples](./docs/IMG_4679up.png)
 
 ### Compatible Board
-![Compatible Board](./docs/IMG_2168up.png)
+![Compatible Board](./docs/IMG_4684up.png)
+
+### COLOR command used game
+![BASIC Game](./docs/IMG_4685up.png)
+![BASIC Game](./docs/IMG_4690up.png)
 
 ## Main Documents
 

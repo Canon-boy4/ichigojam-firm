@@ -329,17 +329,23 @@ Then build as usual. When `IchigoJam_P.uf2` is generated, write it to the Pico.
   - NEC infrared receiver test
 - `ENV_IN_TEST.BAS`
   - AHT20 + BMP280 environment sensor test
+- `ICHIGO_EATER_COLOR.BAS`
+  - COLOR command used game
 
 ## Screenshots
 
 ### Runtime Environment
-![Runtime Environment](./docs/IMG_2095up.png)
+![Runtime Environment](./docs/IMG_4677up.png)
 
 ### Display Examples
-![Display Examples](./docs/IMG_2159up.png)
+![Display Examples](./docs/IMG_4679up.png)
 
-### IchigoJam_P Compatible Board (MECHTARIAT PJ 凸)
-![Compatible Board](./docs/IMG_2168up.png)
+### IchigoJam_P Compatible Board ( GivetakeJam-P )
+![Compatible Board](./docs/IMG_4684up.png)
+
+### COLOR Command used game ( ICHIGO EATER COLOR )
+![BASIC Game](./docs/IMG_4685up.png)
+![BASIC Game](./docs/IMG_4690up.png)
 
 ## Known Limitations / Notes
 
