@@ -6,7 +6,7 @@
 ![Version](https://img.shields.io/badge/version-16124-brightgreen)
 ![Status](https://img.shields.io/badge/status-stable-success)
 
-Extended IchigoJam BASIC for Raspberry Pi Pico with a 4096-byte program area, expanded arrays, improved external EEPROM support, NEC infrared reception, and environmental sensing.
+Extended IchigoJam BASIC for Raspberry Pi Pico with a 4096-byte program area, expanded arrays, improved external EEPROM support, NEC infrared reception, environmental sensing, and color display commands.
 
 ## Highlights
 

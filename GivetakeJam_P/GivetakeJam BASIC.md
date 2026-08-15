@@ -10,10 +10,10 @@
 
 **GivetakeJam BASIC** is an extended version of IchigoJam BASIC for Raspberry Pi Pico.
 
-This firmware enhances program capacity, expands array variables, improves external EEPROM handling, and adds both NEC infrared reception and environmental sensing commands while maintaining compatibility with the original IchigoJam BASIC design.
+This firmware enhances program capacity, expands array variables, improves external EEPROM handling, and adds NEC infrared reception, environmental sensing, and color display commands while maintaining compatibility with the original IchigoJam BASIC design.
 
 **GivetakeJam BASIC** は Raspberry Pi Pico 向け IchigoJam BASIC の拡張版です。  
-プログラム容量の拡張、配列変数の拡張、外部 EEPROM 対応の改善、NEC 赤外線受信コマンドと環境測定コマンドの追加を行い、従来の IchigoJam BASIC との互換性を維持しています。
+プログラム容量の拡張、配列変数の拡張、外部 EEPROM 対応の改善、NEC 赤外線受信コマンド、環境測定コマンド、カラー表示コマンドの追加を行い、従来の IchigoJam BASIC との互換性を維持しています。
 
 ## Version / バージョン
 
