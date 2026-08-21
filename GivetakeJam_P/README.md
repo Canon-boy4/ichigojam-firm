@@ -3,10 +3,10 @@
 ![Platform](https://img.shields.io/badge/platform-Raspberry%20Pi%20Pico-blue)
 ![Language](https://img.shields.io/badge/language-BASIC-orange)
 ![License](https://img.shields.io/badge/license-IchigoJam-green)
-![Version](https://img.shields.io/badge/version-16124-brightgreen)
+![Version](https://img.shields.io/badge/version-16125-brightgreen)
 ![Status](https://img.shields.io/badge/status-stable-success)
 
-Extended IchigoJam BASIC for Raspberry Pi Pico with a 4096-byte program area, expanded arrays, improved external EEPROM support, NEC infrared reception, environmental sensing, and color display commands.
+Extended IchigoJam BASIC for Raspberry Pi Pico with a 4096-byte program area, expanded arrays, improved external EEPROM support, NEC infrared reception, environmental sensing, and color display / palette / attribute commands.
 
 ## Highlights
 
@@ -22,7 +22,10 @@ Extended IchigoJam BASIC for Raspberry Pi Pico with a 4096-byte program area, ex
 - Added `IR.IN` command for NEC infrared reception
 - Added `ENV.IN` command for AHT20 + BMP280 environment sensing
 - Fixed `WS.LED` array access for extended arrays and added bounds checking
-- `VER()` returns `16124` on Raspberry Pi Pico 2 / RP2350
+- `VER()` returns `16125` on Raspberry Pi Pico 2 / RP2350
+- Added `COLOR f[,b[,c]]` command for HSTX DVI text colors
+- Added `PAL n,v`, `PAL RESET`, and `PAL(n)` for RGB332 palette control
+- Added `ATTR x,y,a` and `ATTR(x,y)` for text color attribute control
 - Added MSX-style `COLOR f[,b[,c]]` command for RP2350 HSTX DVI text output
 
 ## Memory Map
@@ -66,7 +69,7 @@ Extended IchigoJam BASIC for Raspberry Pi Pico with a 4096-byte program area, ex
 - Added `ENV.IN` command for AHT20 + BMP280 environment sensing
 - Built-in `HELP` memory map updated
 - `VER()` returns `16115` on Raspberry Pi Pico / RP2040
-- `VER()` returns `16124` on Raspberry Pi Pico 2 / RP2350
+- `VER()` returns `16125` on Raspberry Pi Pico 2 / RP2350
 - Platform identification by `VER(1)`
   - Raspberry Pi Pico / RP2040: `8`
   - Raspberry Pi Pico 2 / RP2350: `9`
@@ -309,16 +312,16 @@ Then build as usual. When `IchigoJam_P.uf2` is generated, write it to the Pico.
 ## Raspberry Pi Pico / RP2040 Firmware / Checksum
 ### Write this firmware to Raspberry Pi Pico / RP2040.
 - `IchigoJam_P.uf2`
-  - `SHA-256`: `CAEC5D43C6B2C485FFE31619B1CC472A64A82E77C53030E415C03E43CB604D6B`
-  - `MD5`: `98BDA73D4EEF1A4CE3BE179E88A93098`
-  - `SHA-1`: `A11FCDCB20C2FABF54DDD968EB3895AFF7537FD6`
+  - `SHA-256`: `6F290119F925896602041F9F3A6D4E5E966A5D7A855424FEBC09CBB938215E5E`
+  - `MD5`: `EBE5EF75F4A9350468FCD01FE41C4498`
+  - `SHA-1`: `2DDD653B6BE92F7A082F66D29C4EC83D9F008C04`
 
 ## Raspberry Pi Pico 2 / RP2350 Firmware / Checksum
 ### Write this firmware to Raspberry Pi Pico 2 / RP2350.
 - `GivetakeJam_P.uf2`
-  - `SHA-256`: `957883406A068C553708B3829337DE71A38213B1E2C342FF8B3439CA481A9D91`
-  - `MD5`: `054450F11C4857C4F008643B7DDAD7F1`
-  - `SHA-1`: `EDA776EB7D51E19A2E03DE18BA171DBD2CF82BC4`
+  - `SHA-256`: `578E1A79E2B885955993356FE32A95CFF68447D564705215EFE04D75124A4591`
+  - `MD5`: `0AC79B4DDC9D2D33B5AFA05795FA7838`
+  - `SHA-1`: `3D329E4141EA872FF1F100AE4074ED8DE4A1E86F`
 
 ## Test Programs
 
@@ -385,9 +388,10 @@ A license is required for redistribution to third parties.
 ---
 
 Givetakewinwin
-
+## Change Log
 - Created: 2026-05-29
 - Updated on 2026-07-18 for Raspberry Pi Pico 2 / RP2350 HSTX DVI support.
 - Updated on 2026-07-29 for Raspberry Pi Pico 2 / Array variables 1125.
 - Updated on 2026-08-10: Fixed `WS.LED` array access and added bounds checking.
 - Updated on 2026-08-14 for Raspberry Pi Pico 2 / Added MSX-style `COLOR` command.
+- Updated on 2026-08-22 for Raspberry Pi Pico 2 / Added palette control and text attribute commands.

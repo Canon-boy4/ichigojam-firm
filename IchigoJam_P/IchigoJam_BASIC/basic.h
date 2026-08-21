@@ -445,6 +445,8 @@ S_INLINE void command_beep(); // S_INLINEで4増
 S_INLINE void command_tempo();
 S_INLINE void command_video();
 S_INLINE void command_color();
+S_INLINE void command_pal();
+S_INLINE void command_attr();
 S_INLINE void command_scroll();
 S_INLINE void command_clp();
 S_INLINE void command_poke();
@@ -756,6 +758,12 @@ int basic_execute(char *commandline)
 			break;
 		case TOKEN_COLOR:
 			command_color();
+			break;
+		case TOKEN_PAL:
+			command_pal();
+			break;
+		case TOKEN_ATTR:
+			command_attr();
 			break;
 			// 76
 
@@ -1680,7 +1688,7 @@ static int16 token_expression5()
 		int n = token_opt1();
 		if (n == 0)
 #ifdef PICO_RP2350
-			return IJB_VER * 100 + IJB_BUILD + 24; // Pico 2 / RP2350版識別用: VER() = 16124
+			return IJB_VER * 100 + IJB_BUILD + 25; // Pico 2 / RP2350版識別用: VER() = 16125
 #else
 			return IJB_VER * 100 + IJB_BUILD + 15; // Pico / RP2040版識別用: VER() = 16115
 #endif
@@ -1827,6 +1835,48 @@ static int16 token_expression5()
 			return in; // 個別に呼んだほうが速い、アナログのせい
 		}
 		return (in & (1 << (v - 1))) != 0;
+	}
+	case TOKEN_PAL_FN:
+	{
+#ifndef PICO_RP2350
+		command_error(ERR_SYNTAX_ERROR);
+		break;
+#else
+		int16 color = token_expression();
+		IJB_ERR_CHK1(0);
+		Token_get(t);
+		if (t.code != TOKEN_PAREN_E)
+		{
+			command_error(ERR_SYNTAX_ERROR);
+			break;
+		}
+		return screen_get_palette(color);
+#endif
+	}
+	case TOKEN_ATTR_FN:
+	{
+#ifndef PICO_RP2350
+		command_error(ERR_SYNTAX_ERROR);
+		break;
+#else
+		int16 x = token_expression();
+		IJB_ERR_CHK1(0);
+		Token_get(t);
+		if (t.code != TOKEN_COMMA)
+		{
+			command_error(ERR_SYNTAX_ERROR);
+			break;
+		}
+		int16 y = token_expression();
+		IJB_ERR_CHK1(0);
+		Token_get(t);
+		if (t.code != TOKEN_PAREN_E)
+		{
+			command_error(ERR_SYNTAX_ERROR);
+			break;
+		}
+		return screen_get_attr(x, y);
+#endif
 	}
 	case TOKEN_VPEEK: // +12byte
 	case TOKEN_SCR:
@@ -3805,6 +3855,10 @@ S_INLINE void command_video()
 // 先頭省略形式 COLOR ,b や COLOR ,,c は現時点では未対応。
 S_INLINE void command_color()
 {
+#ifndef PICO_RP2350
+	command_error(ERR_SYNTAX_ERROR);
+	return;
+#else
 	int16 color[3];
 	int i;
 
@@ -3835,7 +3889,126 @@ S_INLINE void command_color()
 	}
 
 	screen_set_color(color[0], color[1], color[2]);
+#endif
 }
+
+// ===== MODIFIED (Givetake BASIC) =====
+// PAL命令。
+// 書式:
+//   PAL n,v
+//   PAL RESET
+//
+// n: 色番号 0..15
+// v: RGB332値 0..255
+//
+// COLOR命令は色番号を指定するだけだが、PAL命令はその色番号が
+// 実際にどのRGB332値で表示されるかを変更する。
+// 基板、抵抗DAC、LCD、HDMI入力機器ごとの色味調整に使用できる。
+//
+// PAL RESET は、PAL命令で変更したパレットをファームウェア内蔵の
+// デフォルトパレットへ戻す。
+S_INLINE void command_pal()
+{
+	int code = token_getCode();
+
+	if (code == TOKEN_RESET)
+	{
+		token_end();
+#ifndef PICO_RP2350
+		command_error(ERR_SYNTAX_ERROR);
+#else
+		screen_reset_palette();
+#endif
+		return;
+	}
+
+	token_back();
+
+	int16 color = token_expression();
+	IJB_ERR_CHK();
+
+	code = token_getCode();
+	if (code != TOKEN_COMMA)
+	{
+		command_error(ERR_SYNTAX_ERROR);
+		return;
+	}
+
+	int16 value = token_expression();
+	IJB_ERR_CHK();
+
+	token_end();
+
+#ifndef PICO_RP2350
+	command_error(ERR_SYNTAX_ERROR);
+	return;
+#else
+	if (color < 0 || color > 15 || value < 0 || value > 255)
+	{
+		command_error(ERR_INDEX_OUT_OF_RANGE);
+		return;
+	}
+
+	screen_set_palette(color, value);
+#endif
+}
+
+// ===== MODIFIED (Givetake BASIC) =====
+// ATTR命令。
+// 書式:
+//   ATTR x,y,a
+//
+// x,y: 画面座標
+// a  : 色属性値 0..255
+//
+// 属性形式:
+//   a = 前景色 + 背景色 * 16
+//   bit0..3 : 前景色 0..15
+//   bit4..7 : 背景色 0..15
+//
+// COLOR命令は「これから表示する文字」の色を指定する。
+// ATTR命令は「すでに表示済みの文字セル」の色属性を変更する。
+S_INLINE void command_attr()
+{
+	int16 x = token_expression();
+	IJB_ERR_CHK();
+
+	int code = token_getCode();
+	if (code != TOKEN_COMMA)
+	{
+		command_error(ERR_SYNTAX_ERROR);
+		return;
+	}
+
+	int16 y = token_expression();
+	IJB_ERR_CHK();
+
+	code = token_getCode();
+	if (code != TOKEN_COMMA)
+	{
+		command_error(ERR_SYNTAX_ERROR);
+		return;
+	}
+
+	int16 attr = token_expression();
+	IJB_ERR_CHK();
+
+	token_end();
+
+#ifndef PICO_RP2350
+	command_error(ERR_SYNTAX_ERROR);
+	return;
+#else
+	if (x < 0 || x >= SCREEN_W || y < 0 || y >= SCREEN_H || attr < 0 || attr > 255)
+	{
+		command_error(ERR_INDEX_OUT_OF_RANGE);
+		return;
+	}
+
+	screen_set_attr(x, y, attr);
+#endif
+}
+
 S_INLINE void command_scroll()
 {
 	int16 dir = token_expression();

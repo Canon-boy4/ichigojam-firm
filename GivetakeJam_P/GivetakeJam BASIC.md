@@ -3,17 +3,17 @@
 
 ![Platform](https://img.shields.io/badge/platform-Raspberry%20Pi%20Pico-blue)
 ![Language](https://img.shields.io/badge/language-BASIC-orange)
-![Version](https://img.shields.io/badge/VER()-16124-brightgreen)
+![Version](https://img.shields.io/badge/VER()-16125-brightgreen)
 ![Status](https://img.shields.io/badge/status-stable-success)
 
 ## Overview / 概要
 
 **GivetakeJam BASIC** is an extended version of IchigoJam BASIC for Raspberry Pi Pico.
 
-This firmware enhances program capacity, expands array variables, improves external EEPROM handling, and adds NEC infrared reception, environmental sensing, and color display commands while maintaining compatibility with the original IchigoJam BASIC design.
+This firmware enhances program capacity, expands array variables, improves external EEPROM handling, and adds NEC infrared reception, environmental sensing, and color display / palette / attribute commands while maintaining compatibility with the original IchigoJam BASIC design.
 
 **GivetakeJam BASIC** は Raspberry Pi Pico 向け IchigoJam BASIC の拡張版です。  
-プログラム容量の拡張、配列変数の拡張、外部 EEPROM 対応の改善、NEC 赤外線受信コマンド、環境測定コマンド、カラー表示コマンドの追加を行い、従来の IchigoJam BASIC との互換性を維持しています。
+プログラム容量の拡張、配列変数の拡張、外部 EEPROM 対応の改善、NEC 赤外線受信コマンド、環境測定コマンド、カラー表示・パレット変更・色属性コマンドの追加を行い、従来の IchigoJam BASIC との互換性を維持しています。
 
 ## Version / バージョン
 
@@ -26,6 +26,7 @@ This firmware enhances program capacity, expands array variables, improves exter
 - `16122` : RP2350 HSTX DVI dirty-row rendering, DRAW redraw fix, VIDEO resume redraw fix, and Japanese keyboard default when unset.
 - `16123` : RP2350 build fixed `WS.LED` array access for extended arrays and added bounds checking.
 - `16124` : RP2350 build added MSX-style `COLOR f[,b[,c]]` command for HSTX DVI text output.
+- `16125` : Added `PAL`, `PAL RESET`, `PAL(n)`, `ATTR`, and `ATTR(x,y)` for HSTX DVI palette and text attribute control.
 
 ## Highlights / 主な特徴
 

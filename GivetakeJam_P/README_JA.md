@@ -3,10 +3,10 @@
 ![Platform](https://img.shields.io/badge/platform-Raspberry%20Pi%20Pico-blue)
 ![Language](https://img.shields.io/badge/language-BASIC-orange)
 ![License](https://img.shields.io/badge/license-IchigoJam-green)
-![Version](https://img.shields.io/badge/version-16124-brightgreen)
+![Version](https://img.shields.io/badge/version-16125-brightgreen)
 ![Status](https://img.shields.io/badge/status-stable-success)
 
-## プログラム容量の拡張、配列変数の拡張、外部EEPROM対応の改善、NEC方式の赤外線受信コマンド、環境測定コマンド、カラー表示コマンドの追加を行い、従来のIchigoJam P BASICの互換性を維持しながら機能強化しています。
+## プログラム容量の拡張、配列変数の拡張、外部EEPROM対応の改善、NEC方式の赤外線受信コマンド、環境測定コマンド、カラー表示・パレット変更・色属性コマンドの追加を行い、従来のIchigoJam P BASICの互換性を維持しながら機能強化しています。
 ### Pico 2 / RP2350版の配列領域拡張
 Pico 2 / RP2350版では、増加RAMを利用して配列変数領域 VAR2 を拡張しています。
 
@@ -156,7 +156,10 @@ COLOR 8,1,1
 
 - 拡張版識別のため `VER()` を変更
   - Raspberry Pi Pico / RP2040版: `16115`
-  - Raspberry Pi Pico 2 / RP2350版: `16124`
+  - Raspberry Pi Pico 2 / RP2350版: `16125`
+- `COLOR f[,b[,c]]` によるHSTX DVIテキストカラー指定
+- `PAL n,v` / `PAL RESET` / `PAL(n)` によるRGB332パレット制御
+- `ATTR x,y,a` / `ATTR(x,y)` による画面文字セルの色属性制御
 
   使用例 BASIC
 
@@ -171,7 +174,7 @@ COLOR 8,1,1
   Raspberry Pi Pico 2 / RP2350版:
   ```sh
   ? VER()
-  16124
+  16125
   ? VER(1)
   9
   ```
@@ -241,16 +244,16 @@ make
 ## Raspberry Pi Pico / RP2040 Firmware / Checksum
 ### Raspberry Pi Pico / RP2040用の4K版ファームウェアファイルです。
 - `IchigoJam_P.uf2`
-  - SHA-256: `CAEC5D43C6B2C485FFE31619B1CC472A64A82E77C53030E415C03E43CB604D6B`
-  - MD5: `98BDA73D4EEF1A4CE3BE179E88A93098`
-  - SHA-1: `A11FCDCB20C2FABF54DDD968EB3895AFF7537FD6`
+  - SHA-256: `6F290119F925896602041F9F3A6D4E5E966A5D7A855424FEBC09CBB938215E5E`
+  - MD5: `EBE5EF75F4A9350468FCD01FE41C4498`
+  - SHA-1: `2DDD653B6BE92F7A082F66D29C4EC83D9F008C04`
 
-## Raspberry Pi Pico 2 / RP23500 Firmware / Checksum
+## Raspberry Pi Pico 2 / RP2350 Firmware / Checksum
 ### Raspberry Pi Pico 2 / RP2350用の4K版ファームウェアファイルです。
 - `GivetakeJam_P.uf2`
-  - SHA-256: `957883406A068C553708B3829337DE71A38213B1E2C342FF8B3439CA481A9D91`
-  - MD5: `054450F11C4857C4F008643B7DDAD7F1`
-  - SHA-1: `EDA776EB7D51E19A2E03DE18BA171DBD2CF82BC4`
+  - SHA-256: `578E1A79E2B885955993356FE32A95CFF68447D564705215EFE04D75124A4591`
+  - MD5: `0AC79B4DDC9D2D33B5AFA05795FA7838`
+  - SHA-1: `3D329E4141EA872FF1F100AE4074ED8DE4A1E86F`
 
 ## Test Programs
 
@@ -310,13 +313,16 @@ make
 - EEPROM検出はI2C アドレス 0x50 の応答で判定
 - IR受信を安定させるため、BASIC側で repeat 除外を推奨します
 
-ギブテクウインウイン
+---
 
-- 2026/5/29 作成
-- 2026/7/18 Pico 2 / RP2350 HSTX DVI版を追加
-- 2026/7/29 Pico 2 配列変数を 1125 まで増加
-- 2026/8/10 `WS.LED` の拡張配列変数へのアクセスと上限チェックを修正
-- 2026/8/14 Pico 2 / RP2350 HSTX DVI テキスト出力向けに MSX風 `COLOR` 命令を追加
+ギブテクウインウイン
+## 変更履歴
+- 2026/05/29 作成
+- 2026/07/18 Pico 2 / RP2350 HSTX DVI版を追加
+- 2026/07/29 Pico 2 配列変数を 1125 まで増加
+- 2026/08/10 `WS.LED` の拡張配列変数へのアクセスと上限チェックを修正
+- 2026/08/14 Pico 2 / RP2350 HSTX DVI テキスト出力向けに MSX風 `COLOR` 命令を追加
+- 2026/08/22 Pico 2 / RP2350 HSTX DVI テキスト出力向けにパレット変更・色属性命令を追加
 
 ![Release](https://img.shields.io/github/v/release/IchigoJam/ichigojam-firm)
 ![Downloads](https://img.shields.io/github/downloads/IchigoJam/ichigojam-firm/total)

@@ -139,24 +139,44 @@ void vram_to_framebuf_all(bool visible_cursor) {
 //   4:暗い青, 5:明るい青, 6:暗い赤, 7:水色,
 //   8:赤, 9:明るい赤, 10:黄色, 11:明るい黄色,
 //   12:暗い緑, 13:紫, 14:灰色, 15:白
-static const uint8_t hstx_msx_color_rgb332[16] = {
-	0x00, // 0 transparent -> black
-	0x00, // 1 black
-	0x1C, // 2 green
-	0x7C, // 3 light green
-	0x03, // 4 dark blue
-	0x1F, // 5 light blue
-	0x80, // 6 dark red
-	0x1F, // 7 cyan
-	0xE0, // 8 red
-	0xF8, // 9 light red
-	0xFC, // 10 yellow
-	0xFE, // 11 light yellow
-	0x10, // 12 dark green
-	0xE3, // 13 magenta
-	0xB6, // 14 gray
-	0xFF  // 15 white
-};
+// デフォルトパレット定義。
+// 基本パレットの色を変更する場合は、この HSTX_MSX_COLOR_RGB332_DEFAULT を変更する。
+// 起動時の初期値と PAL RESET の戻り値は、この定義を共通で使用する。
+#define HSTX_MSX_COLOR_RGB332_DEFAULT { \
+	0x00, /* 0 transparent -> black */ \
+	0x00, /* 1 black */ \
+	0x3D, /* 2 green */ \
+	0x7D, /* 3 light green */ \
+	0x27, /* 4 dark blue */ \
+	0x4F, /* 5 light blue */ \
+	0xEC, /* 6 dark red */ \
+	0x5B, /* 7 cyan */ \
+	0xE5, /* 8 red */ \
+	0xEE, /* 9 light red */ \
+	0xFC, /* 10 yellow */ \
+	0xDD, /* 11 light yellow */ \
+	0x31, /* 12 dark green */ \
+	0xC7, /* 13 magenta */ \
+	0xB6, /* 14 gray */ \
+	0xFF  /* 15 white */ \
+}
+
+// PAL命令で実行中に変更されるRGB332パレット。
+// COLOR命令の色番号は、この配列を通して実際の表示色へ変換される。
+uint8 hstx_msx_color_rgb332[16] = HSTX_MSX_COLOR_RGB332_DEFAULT;
+
+// PAL RESET 用。
+// 実行中に変更されたパレットを、起動時と同じデフォルト値へ戻す。
+// パレット変更は画面全体へ影響するため、全行をdirtyにする。
+void screen_reset_palette(void)
+{
+	static const uint8 default_palette[16] = HSTX_MSX_COLOR_RGB332_DEFAULT;
+
+	for (int i = 0; i < 16; i++) {
+		hstx_msx_color_rgb332[i] = default_palette[i];
+	}
+	screen_dirty_all();
+}
 
 void vram_to_hstx_row(int vram_y, bool visible_cursor) {
     const int mag = 1 << _g.screen_big;

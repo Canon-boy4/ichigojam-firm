@@ -106,6 +106,12 @@ static uint8 screen_color_fg = 15;
 static uint8 screen_color_bg = 1;
 static uint8 screen_color_border = 1;
 
+// RP2350 HSTX DVI描画で使用するRGB332パレット。
+// 実体は init.h 側に置き、PAL命令で実行中に変更できるようにする。
+// PAL RESET は init.h 側のデフォルト値へ戻す。
+extern uint8 hstx_msx_color_rgb332[16];
+void screen_reset_palette(void);
+
 S_INLINE uint8 screen_make_attr(uint8 fg, uint8 bg)
 {
 	return (fg & 15) | ((bg & 15) << 4);
@@ -160,6 +166,50 @@ S_INLINE void screen_attr_set_cell(int pos)
 {
 	if (0 <= pos && pos < SCREEN_ATTR_SIZE) {
 		screen_attr[pos] = screen_current_attr();
+	}
+}
+
+// 指定座標 x,y の色属性を取得する。
+// 属性形式:
+//   bit0..3 : 前景色 0..15
+//   bit4..7 : 背景色 0..15
+S_INLINE uint8 screen_get_attr(int x, int y)
+{
+	if (0 <= x && x < SCREEN_W && 0 <= y && y < SCREEN_H) {
+		return screen_attr[y * SCREEN_W + x];
+	}
+	return 0;
+}
+
+// 指定座標 x,y の色属性を設定する。
+// BASIC側では ATTR x,y,a として使用する。
+// a = 前景色 + 背景色 * 16。
+S_INLINE void screen_set_attr(int x, int y, int attr)
+{
+	if (0 <= x && x < SCREEN_W && 0 <= y && y < SCREEN_H) {
+		screen_attr[y * SCREEN_W + x] = attr & 0xff;
+		screen_dirty_rows |= 1u << y;
+	}
+}
+
+// 色番号 0..15 に対応するRGB332パレット値を取得する。
+// BASIC側では PAL(n) として使用する。
+S_INLINE uint8 screen_get_palette(int color)
+{
+	if (0 <= color && color < 16) {
+		return hstx_msx_color_rgb332[color];
+	}
+	return 0;
+}
+
+// 色番号 0..15 に対応するRGB332パレット値を設定する。
+// BASIC側では PAL n,v として使用する。
+// パレット変更は画面全体に影響するため、全行をdirtyにする。
+S_INLINE void screen_set_palette(int color, int rgb332)
+{
+	if (0 <= color && color < 16) {
+		hstx_msx_color_rgb332[color] = rgb332 & 0xff;
+		screen_dirty_rows = (1u << SCREEN_H) - 1u;
 	}
 }
 
@@ -228,6 +278,11 @@ S_INLINE void screen_dirty_clear_all(void)
 #define screen_attr_fill_range(start, len)
 #define screen_attr_copy_cell(dst, src)
 #define screen_attr_set_cell(pos)
+#define screen_get_attr(x, y) 0
+#define screen_set_attr(x, y, attr)
+#define screen_get_palette(color) 0
+#define screen_set_palette(color, rgb332)
+#define screen_reset_palette()
 #define screen_set_color(fg, bg, border)
 #endif
 
