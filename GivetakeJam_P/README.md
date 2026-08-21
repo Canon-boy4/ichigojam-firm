@@ -1,15 +1,11 @@
 # GivetakeJam BASIC
-
 ![Platform](https://img.shields.io/badge/platform-Raspberry%20Pi%20Pico-blue)
 ![Language](https://img.shields.io/badge/language-BASIC-orange)
 ![License](https://img.shields.io/badge/license-IchigoJam-green)
 ![Version](https://img.shields.io/badge/version-16125-brightgreen)
 ![Status](https://img.shields.io/badge/status-stable-success)
-
 Extended IchigoJam BASIC for Raspberry Pi Pico with a 4096-byte program area, expanded arrays, improved external EEPROM support, NEC infrared reception, environmental sensing, and color display / palette / attribute commands.
-
 ## Highlights
-
 - Full compatibility with IchigoJam BASIC 1.6.1 commands
 - Program size expanded from 1024 bytes to 4096 bytes
 - Internal flash storage slots
@@ -27,9 +23,7 @@ Extended IchigoJam BASIC for Raspberry Pi Pico with a 4096-byte program area, ex
 - Added `PAL n,v`, `PAL RESET`, and `PAL(n)` for RGB332 palette control
 - Added `ATTR x,y,a` and `ATTR(x,y)` for text color attribute control
 - Added MSX-style `COLOR f[,b[,c]]` command for RP2350 HSTX DVI text output
-
 ## Memory Map
-
 ```text
 #000 CHAR
 #700 PCG
@@ -39,9 +33,7 @@ Extended IchigoJam BASIC for Raspberry Pi Pico with a 4096-byte program area, ex
 #E00 LIST (RP2040)
 #1400 LIST (RP2350)
 ```
-
 ## Features / Changes
-
 - Expanded program size from 1024 bytes to 4096 bytes per program
 - Reduced internal storage slots from 100 to 25
 - Extended array variables
@@ -73,19 +65,13 @@ Extended IchigoJam BASIC for Raspberry Pi Pico with a 4096-byte program area, ex
 - Platform identification by `VER(1)`
   - Raspberry Pi Pico / RP2040: `8`
   - Raspberry Pi Pico 2 / RP2350: `9`
-
 ## IR.IN Command
-
 `IR.IN` receives NEC-format infrared codes from an HX1838-compatible receiver.
-
 ### Syntax
-
 ```basic
 IR.IN port,[n]
 ```
-
 ### Result Layout
-
 - `[n+0]` = raw byte 0
 - `[n+1]` = raw byte 1
 - `[n+2]` = raw byte 2
@@ -95,9 +81,7 @@ IR.IN port,[n]
 - `[n+6]` = mode
   - `0` = standard NEC
   - `1` = NEC extended
-
 ### Example
-
 ```basic
 10 ' IR.IN Test Program
 20 IR.IN 1,[0]
@@ -109,26 +93,18 @@ IR.IN port,[n]
 80 WAIT 5
 90 GOTO 20
 ```
-
 ### Example Output
-
 ```text
 807F01FE
 ```
-
 ### Notes
-
 - HX1838 output is assumed to be idle HIGH
 - The 38kHz carrier is already demodulated by the receiver module
 - For stable operation, error filtering and repeat filtering are recommended
 - The timing-critical decode section is protected after leader detection
-
 ## Raspberry Pi Pico 2 / RP2350 Support
-
 The Raspberry Pi Pico 2 / RP2350 build supports HSTX DVI video output.
-
 Confirmed features on Pico 2:
-
 - HSTX DVI video output
   - Optimized HSTX DVI text rendering by updating only dirty screen rows.
   - Fixed DRAW screen update with dirty-row rendering.
@@ -147,39 +123,29 @@ Confirmed features on Pico 2:
   - Internal flash slots `0` to `99`
 - External I2C EEPROM slots `100` to `131`
 - `LRUN` from external EEPROM
-
 ### Pico 2 IR.IN Example
-
 ```basic
 10 CLS
 20 IR.IN 4,[0]:IF [5]<>0 CONT
 30 A=[2] & #FF
 40 ?HEX$(A,2)
 ```
-
-For the Pico 2 HSTX DVI build, HSTX video uses DMA channels 0 and 1.  
+For the Pico 2 HSTX DVI build, HSTX video uses DMA channels 0 and 1.
 The RP2350 `IR.IN` PIO DMA implementation uses DMA channel 10, so it does not conflict with HSTX video DMA.
-
 ## COLOR Command
-
 `COLOR` sets text colors for the RP2350 / Pico 2 HSTX DVI build.
-
+On the Raspberry Pi Pico / RP2040 build, `COLOR` is not supported and results in a syntax error.
 ### Syntax
-
 ```basic
 COLOR f
 COLOR f,b
 COLOR f,b,c
 ```
-
 - `f`: foreground color, 0-15
 - `b`: background color, 0-15
 - `c`: border/surrounding color, 0-15
-
 The current implementation affects newly printed text and `CLS`; existing text is not recolored retroactively.
-
 ### Example
-
 ```basic
 CLS
 COLOR 15,1,1
@@ -189,19 +155,72 @@ COLOR 10,1,1
 COLOR 8,1,1
 ?"RED"
 ```
-
-## ENV.IN Command
-
-`ENV.IN` reads temperature and humidity from AHT20 and pressure from BMP280 over I2C.
-
+## PAL Command
+`PAL` controls the RGB332 palette for the RP2350 / Pico 2 HSTX DVI build.
+On the Raspberry Pi Pico / RP2040 build, `PAL` is not supported and results in a syntax error.
 ### Syntax
-
+```basic
+PAL n,v
+V=PAL(n)
+PAL RESET
+```
+- `n`: color number, 0-15
+- `v`: RGB332 palette value, 0-255
+- `PAL n,v`: sets the RGB332 palette value for color number `n`
+- `PAL(n)`: returns the current RGB332 palette value for color number `n`
+- `PAL RESET`: restores the default firmware palette
+### RGB332 Format
+```text
+bit7..5 : Red   0..7
+bit4..2 : Green 0..7
+bit1..0 : Blue  0..3
+```
+### Example
+```basic
+10 CLS
+20 ?PAL(10)
+30 PAL 10,#E0
+40 ?PAL(10)
+50 PAL RESET
+60 ?PAL(10)
+70 COLOR 10,1,1
+80 ?"PAL RESET OK"
+```
+## ATTR Command
+`ATTR` changes or reads the color attribute of an already displayed text cell on the RP2350 / Pico 2 HSTX DVI build.
+On the Raspberry Pi Pico / RP2040 build, `ATTR` is not supported and results in a syntax error.
+### Syntax
+```basic
+ATTR x,y,a
+A=ATTR(x,y)
+```
+- `x,y`: screen position
+- `a`: text color attribute value, 0-255
+- lower 4 bits: foreground color
+- upper 4 bits: background color
+### Attribute Format
+```basic
+A=FG+BG*16
+FG=A&#F
+BG=A>>4
+```
+### Example
+```basic
+10 CLS
+20 COLOR 15,1,1
+30 LC 5,5:?"A"
+40 ?ATTR(5,5)
+50 ATTR 5,5,15+8*16
+60 ?ATTR(5,5)
+```
+This example changes the displayed `A` to white text on a red background.
+## ENV.IN Command
+`ENV.IN` reads temperature and humidity from AHT20 and pressure from BMP280 over I2C.
+### Syntax
 ```basic
 ENV.IN [n]
 ```
-
 ### Result Layout
-
 - `[n+0]` = temperature from AHT20 in 0.1°C units
 - `[n+1]` = humidity from AHT20 in 0.1%RH units
 - `[n+2]` = pressure from BMP280 in 0.1 hPa units
@@ -210,18 +229,14 @@ ENV.IN [n]
 - `[n+5]` = status flag
   - bit0 = AHT20 OK
   - bit1 = BMP280 OK
-
 ### Error Codes
-
 - `0` = success
 - `1` = AHT20 not found
 - `2` = BMP280 not found (not fatal if AHT20 is available)
 - `3` = AHT20 measurement failed
 - `4` = BMP280 read failed
 - `5` = BMP280 chip ID mismatch
-
 ### Example
-
 ```basic
 10 ' ENV.IN Test Program
 20 ENV.IN [0]
@@ -236,20 +251,13 @@ ENV.IN [n]
 110 WAIT 60
 120 GOTO 20
 ```
-
 ## Build Environment
-
 Create the build environment inside the `IchigoJam_P` directory.
-
 ### Required tools
-
 - CMake
 - GCC
-
 ### Required libraries
-
 Place the following under the `IchigoJam_P` directory:
-
 - `IchigoJam_BASIC`
   - Copy the `IchigoJam_BASIC` directory from one level above
 - `pico-sdk`
@@ -265,18 +273,13 @@ Place the following under the `IchigoJam_P` directory:
 - `PicoDVI`
   - Repository: `https://github.com/mlorenzati/PicoDVI.git`
   - Use commit `579eecc`
-
 ### Environment variables
-
 ```sh
 PICO_SDK_PATH=foo/IchigoJam_P/pico-sdk
 PICO_EXTRAS_PATH=foo/IchigoJam_P/pico-extras
 ```
-
 See the Raspberry Pi documentation for details.
-
 ## Build
-
 ```sh
 cd IchigoJam_P
 mkdir build
@@ -284,19 +287,12 @@ cd build
 cmake ..
 make
 ```
-
 When `IchigoJam_P.uf2` is generated, write it to the Raspberry Pi Pico.
-
 ## If Something Goes Wrong
-
 Try deleting the `build` directory and rebuilding from scratch.
-
 This is especially effective when video output becomes unstable.
-
 ## Files to Overwrite for the 4K Version
-
 Copy the following files from the `GivetakeJam_P` directory into the corresponding `IchigoJam_P` directories:
-
 - `IchigoJam_BASIC`
   - `basic.h`
   - `ram.h`
@@ -306,25 +302,20 @@ Copy the following files from the `GivetakeJam_P` directory into the correspondi
   - `i2ceeprom.h`
   - `storage.h`
   - `io.h`
-
 Then build as usual. When `IchigoJam_P.uf2` is generated, write it to the Pico.
-
 ## Raspberry Pi Pico / RP2040 Firmware / Checksum
 ### Write this firmware to Raspberry Pi Pico / RP2040.
 - `IchigoJam_P.uf2`
   - `SHA-256`: `6F290119F925896602041F9F3A6D4E5E966A5D7A855424FEBC09CBB938215E5E`
   - `MD5`: `EBE5EF75F4A9350468FCD01FE41C4498`
   - `SHA-1`: `2DDD653B6BE92F7A082F66D29C4EC83D9F008C04`
-
 ## Raspberry Pi Pico 2 / RP2350 Firmware / Checksum
 ### Write this firmware to Raspberry Pi Pico 2 / RP2350.
 - `GivetakeJam_P.uf2`
   - `SHA-256`: `578E1A79E2B885955993356FE32A95CFF68447D564705215EFE04D75124A4591`
   - `MD5`: `0AC79B4DDC9D2D33B5AFA05795FA7838`
   - `SHA-1`: `3D329E4141EA872FF1F100AE4074ED8DE4A1E86F`
-
 ## Test Programs
-
 - `ARRAY_VAR_TOTAL_TEST.BAS`
   - Comprehensive array-variable test
   - Verified to finish with `ALL OK`
@@ -334,24 +325,17 @@ Then build as usual. When `IchigoJam_P.uf2` is generated, write it to the Pico.
   - AHT20 + BMP280 environment sensor test
 - `ICHIGO_EATER_COLOR.BAS`
   - COLOR command used game
-
 ## Screenshots
-
 ### Runtime Environment
 ![Runtime Environment](./docs/IMG_4677up.png)
-
 ### Display Examples
 ![Display Examples](./docs/IMG_4679up.png)
-
 ### IchigoJam_P Compatible Board ( GivetakeJam-P )
 ![Compatible Board](./docs/IMG_4684up.png)
-
 ### COLOR Command used game ( ICHIGO EATER COLOR )
 ![BASIC Game](./docs/IMG_4685up.png)
 ![BASIC Game](./docs/IMG_4690up.png)
-
 ## Known Limitations / Notes
-
 - Program size is limited to 4096 bytes
 - Internal storage provides 25 slots
 - External EEPROM display range is fixed to `100..131`
@@ -365,28 +349,19 @@ Then build as usual. When `IchigoJam_P.uf2` is generated, write it to the Pico.
 - Labels ending with digits may cause syntax errors
 - Division is integer-only
 - For stable IR reception, repeat filtering is recommended in BASIC
-
 ## License
-
-Copyright 2014-2025 the IchigoJam authors. All rights reserved.  
-MIT license.  
+Copyright 2014-2025 the IchigoJam authors. All rights reserved.
+MIT license.
 https://ichigojam.net/license
-
 ## Trademark
-
 - IchigoJam is a registered trademark of jig.jp Co., Ltd.
 - Raspberry Pi is a registered trademark of the Raspberry Pi Foundation.
-
 ## Terms of Use
-
-Please download after agreeing to the terms of use.  
+Please download after agreeing to the terms of use.
 A license is required for redistribution to third parties.
-
 - Terms of use: https://pcn.club/sp/ijp/
 - IchigoJam Royalty-Free Program License: https://ichigojam.net/ichigojam-license.pdf
-
 ---
-
 Givetakewinwin
 ## Change Log
 - Created: 2026-05-29
