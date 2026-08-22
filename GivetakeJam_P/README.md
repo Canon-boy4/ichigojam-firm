@@ -325,6 +325,10 @@ Then build as usual. When `IchigoJam_P.uf2` is generated, write it to the Pico.
   - AHT20 + BMP280 environment sensor test
 - `ICHIGO_EATER_COLOR.BAS`
   - COLOR command used game
+- `PAL_RGB332_CHANGE.BAS`
+  - PAL / RGB332 palette change sample for RP2350 HSTX DVI
+  - Use cursor keys to select a color number and adjust its RGB332 palette value.
+  - `R` restores the default firmware palette with `PAL RESET`.
 ## Screenshots
 ### Runtime Environment
 ![Runtime Environment](./docs/IMG_4677up.png)
@@ -335,6 +339,15 @@ Then build as usual. When `IchigoJam_P.uf2` is generated, write it to the Pico.
 ### COLOR Command used game ( ICHIGO EATER COLOR )
 ![BASIC Game](./docs/IMG_4685up.png)
 ![BASIC Game](./docs/IMG_4690up.png)
+
+### PAL RGB332 change sample
+![PAL RGB332 Change](./docs/IMG_4984up.png)
+
+`PAL_RGB332_CHANGE.BAS` is a sample program for checking and adjusting the RP2350 HSTX DVI RGB332 palette.
+
+The program displays the selected color number, its RGB332 value, the decoded R/G/B components, foreground samples, and background samples.
+Use the cursor keys to select a color number and change the palette value.
+Press `R` to restore the default firmware palette with `PAL RESET`.
 ## Known Limitations / Notes
 - Program size is limited to 4096 bytes
 - Internal storage provides 25 slots

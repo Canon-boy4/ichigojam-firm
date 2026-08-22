@@ -284,6 +284,10 @@ make
   - AHT20 + BMP280 環境測定のテストプログラムです。
 - `ICHIGO_EATER_COLOR.BAS`
   - COLOR コマンドを使った BASIC ゲームです。
+- `PAL_RGB332_CHANGE.BAS`
+  - RP2350 HSTX DVI 用の PAL / RGB332 パレット変更サンプルです。
+  - カーソルキーで色番号を選択し、RGB332 パレット値を変更できます。
+  - `R` キーで `PAL RESET` を実行し、ファームウェア内蔵のデフォルトパレットに戻します。
 ## Screenshot
 ### 動作環境
 ![screenshot](./docs/IMG_4677up.png)
@@ -294,6 +298,15 @@ make
 ### COLOR コマンド使用画面 ( ICHIGO EATER COLOR画面 )
 ![screenshot](./docs/IMG_4685up.png)
 ![screenshot](./docs/IMG_4690up.png)
+
+### PAL RGB332 変更サンプル
+![screenshot](./docs/IMG_4984up.png)
+
+`PAL_RGB332_CHANGE.BAS` は、RP2350 HSTX DVI 版の RGB332 パレットを確認・変更するためのサンプルプログラムです。
+
+選択中の色番号、RGB332値、R/G/B成分、前景色サンプル、背景色サンプルを表示します。
+カーソルキーで色番号の選択とパレット値の変更を行います。
+`R` キーで `PAL RESET` を実行し、ファームウェア内蔵のデフォルトパレットに戻します。
 ## ライセンス / license
     - Copyright 2014-2025 the IchigoJam authors. All rights reserved. MIT license.  https://ichigojam.net/license
 ## 商標 / Trademark
