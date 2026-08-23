@@ -1688,7 +1688,7 @@ static int16 token_expression5()
 		int n = token_opt1();
 		if (n == 0)
 #ifdef PICO_RP2350
-			return IJB_VER * 100 + IJB_BUILD + 25; // Pico 2 / RP2350版識別用: VER() = 16125
+			return IJB_VER * 100 + IJB_BUILD + 26; // Pico 2 / RP2350版識別用: VER() = 16126
 #else
 			return IJB_VER * 100 + IJB_BUILD + 15; // Pico / RP2040版識別用: VER() = 16115
 #endif
@@ -4029,6 +4029,18 @@ S_INLINE void command_poke()
 	int16 n2 = token_expression();
 	IJB_ERR_CHK();
 	IJB_poke(n1, n2);
+#ifdef PICO_RP2350
+	// RP2350 HSTX DVI の画面更新は dirty 行だけを再描画する。
+	// POKE は screen_putc() を通らずに VRAM / PCG を直接書き換えるため、
+	// ここで明示的に dirty を立てないと画面に反映されない。
+	if (0x900 <= n1 && n1 < 0x900 + SCREEN_W * SCREEN_H) {
+		// #900〜 はVRAM。書き換えた文字セルを含む行だけを再描画する。
+		screen_dirty_row((n1 - 0x900) >> 5);
+	} else if (0x700 <= n1 && n1 < 0x800) {
+		// #700〜#7FF はPCG。どの表示文字に影響するか特定しにくいため全行を再描画する。
+		screen_dirty_all();
+	}
+#endif
 	for (;;)
 	{
 		code = token_getCode();
@@ -4042,6 +4054,16 @@ S_INLINE void command_poke()
 		n2 = token_expression();
 		IJB_ERR_CHK();
 		IJB_poke(n1, n2);
+#ifdef PICO_RP2350
+		// 連続 POKE の2バイト目以降も、同様に dirty 更新を行う。
+		if (0x900 <= n1 && n1 < 0x900 + SCREEN_W * SCREEN_H) {
+			// VRAM直接書き換えは、対象行のみ再描画する。
+			screen_dirty_row((n1 - 0x900) >> 5);
+		} else if (0x700 <= n1 && n1 < 0x800) {
+			// PCG変更は表示中の文字全体に影響する可能性があるため全画面再描画する。
+			screen_dirty_all();
+		}
+#endif
 	}
 }
 /*

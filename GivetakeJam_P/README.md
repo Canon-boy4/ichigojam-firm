@@ -2,7 +2,7 @@
 ![Platform](https://img.shields.io/badge/platform-Raspberry%20Pi%20Pico-blue)
 ![Language](https://img.shields.io/badge/language-BASIC-orange)
 ![License](https://img.shields.io/badge/license-IchigoJam-green)
-![Version](https://img.shields.io/badge/version-16125-brightgreen)
+![Version](https://img.shields.io/badge/version-16126-brightgreen)
 ![Status](https://img.shields.io/badge/status-stable-success)
 Extended IchigoJam BASIC for Raspberry Pi Pico with a 4096-byte program area, expanded arrays, improved external EEPROM support, NEC infrared reception, environmental sensing, and color display / palette / attribute commands.
 ## Highlights
@@ -18,7 +18,7 @@ Extended IchigoJam BASIC for Raspberry Pi Pico with a 4096-byte program area, ex
 - Added `IR.IN` command for NEC infrared reception
 - Added `ENV.IN` command for AHT20 + BMP280 environment sensing
 - Fixed `WS.LED` array access for extended arrays and added bounds checking
-- `VER()` returns `16125` on Raspberry Pi Pico 2 / RP2350
+- `VER()` returns `16126` on Raspberry Pi Pico 2 / RP2350
 - Added `COLOR f[,b[,c]]` command for HSTX DVI text colors
 - Added `PAL n,v`, `PAL RESET`, and `PAL(n)` for RGB332 palette control
 - Added `ATTR x,y,a` and `ATTR(x,y)` for text color attribute control
@@ -61,7 +61,7 @@ Extended IchigoJam BASIC for Raspberry Pi Pico with a 4096-byte program area, ex
 - Added `ENV.IN` command for AHT20 + BMP280 environment sensing
 - Built-in `HELP` memory map updated
 - `VER()` returns `16115` on Raspberry Pi Pico / RP2040
-- `VER()` returns `16125` on Raspberry Pi Pico 2 / RP2350
+- `VER()` returns `16126` on Raspberry Pi Pico 2 / RP2350
 - Platform identification by `VER(1)`
   - Raspberry Pi Pico / RP2040: `8`
   - Raspberry Pi Pico 2 / RP2350: `9`
@@ -312,9 +312,9 @@ Then build as usual. When `IchigoJam_P.uf2` is generated, write it to the Pico.
 ## Raspberry Pi Pico 2 / RP2350 Firmware / Checksum
 ### Write this firmware to Raspberry Pi Pico 2 / RP2350.
 - `GivetakeJam_P.uf2`
-  - `SHA-256`: `578E1A79E2B885955993356FE32A95CFF68447D564705215EFE04D75124A4591`
-  - `MD5`: `0AC79B4DDC9D2D33B5AFA05795FA7838`
-  - `SHA-1`: `3D329E4141EA872FF1F100AE4074ED8DE4A1E86F`
+  - `SHA-256`: `30B67995066E759BCE4B1C797B4529E0784F3CD52BBAAD4002C8A6DBB9ECC1FD`
+  - `MD5`: `3D0502D424BCA85C52FD7517562A567B`
+  - `SHA-1`: `66C7E88882003CA7BD01E49931C90A65FB085980`
 ## Test Programs
 - `ARRAY_VAR_TOTAL_TEST.BAS`
   - Comprehensive array-variable test
@@ -383,3 +383,4 @@ Givetakewinwin
 - Updated on 2026-08-10: Fixed `WS.LED` array access and added bounds checking.
 - Updated on 2026-08-14 for Raspberry Pi Pico 2 / Added MSX-style `COLOR` command.
 - Updated on 2026-08-22 for Raspberry Pi Pico 2 / Added palette control and text attribute commands.
+- Updated on 2026-08-23 for Raspberry Pi Pico 2 / Refresh HSTX DVI display after `POKE` writes to VRAM and PCG.
