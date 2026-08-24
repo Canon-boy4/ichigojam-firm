@@ -3,7 +3,7 @@
 
 ![Platform](https://img.shields.io/badge/platform-Raspberry%20Pi%20Pico-blue)
 ![Language](https://img.shields.io/badge/language-BASIC-orange)
-![Version](https://img.shields.io/badge/VER()-16126-brightgreen)
+![Version](https://img.shields.io/badge/VER()-16127-brightgreen)
 ![Status](https://img.shields.io/badge/status-stable-success)
 
 ## Overview / 概要
@@ -28,6 +28,7 @@ This firmware enhances program capacity, expands array variables, improves exter
 - `16124` : RP2350 build added MSX-style `COLOR f[,b[,c]]` command for HSTX DVI text output.
 - `16125` : Added `PAL`, `PAL RESET`, `PAL(n)`, `ATTR`, and `ATTR(x,y)` for HSTX DVI palette and text attribute control.
 - `16126` : RP2350 build refreshes HSTX DVI display after `POKE` writes to VRAM and PCG.
+- `16127` : RP2350 build refreshes all wrapped display rows when editing long listed lines.
 
 ## Highlights / 主な特徴
 

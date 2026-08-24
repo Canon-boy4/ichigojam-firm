@@ -2,7 +2,7 @@
 ![Platform](https://img.shields.io/badge/platform-Raspberry%20Pi%20Pico-blue)
 ![Language](https://img.shields.io/badge/language-BASIC-orange)
 ![License](https://img.shields.io/badge/license-IchigoJam-green)
-![Version](https://img.shields.io/badge/version-16126-brightgreen)
+![Version](https://img.shields.io/badge/version-16127-brightgreen)
 ![Status](https://img.shields.io/badge/status-stable-success)
 ## プログラム容量の拡張、配列変数の拡張、外部EEPROM対応の改善、NEC方式の赤外線受信コマンド、環境測定コマンド、カラー表示・パレット変更・色属性コマンドの追加を行い、従来のIchigoJam P BASICの互換性を維持しながら機能強化しています。
 ### Pico 2 / RP2350版の配列領域拡張
@@ -194,7 +194,7 @@ Pico 2 / RP2350版では、増加RAMを利用して配列変数領域 VAR2 を�
 - `ATTR x,y,a` / `ATTR(x,y)` による画面文字セルの色属性制御
 - 拡張版識別のため `VER()` を変更
   - Raspberry Pi Pico / RP2040版: `16115`
-  - Raspberry Pi Pico 2 / RP2350版: `16126`
+  - Raspberry Pi Pico 2 / RP2350版: `16127`
   - 使用例 BASIC
     - Raspberry Pi Pico / RP2040版:
     ```sh
@@ -206,7 +206,7 @@ Pico 2 / RP2350版では、増加RAMを利用して配列変数領域 VAR2 を�
     - Raspberry Pi Pico 2 / RP2350版:
     ```sh
     ? VER()
-    16126
+    16127
     ? VER(1)
     9
     ```
@@ -265,9 +265,9 @@ make
 ## Raspberry Pi Pico 2 / RP2350 Firmware / Checksum
 ### Raspberry Pi Pico 2 / RP2350用の4K版ファームウェアファイルです。
 - `GivetakeJam_P.uf2`
-  - SHA-256: `30B67995066E759BCE4B1C797B4529E0784F3CD52BBAAD4002C8A6DBB9ECC1FD`
-  - MD5: `3D0502D424BCA85C52FD7517562A567B`
-  - SHA-1: `66C7E88882003CA7BD01E49931C90A65FB085980`
+  - SHA-256: `9828B6704E8E2496F2CD538093F20A9539BB660745E2592DB651954CD6F90088`
+  - MD5: `B853664EEB399E55220F5F17C5BC7F80`
+  - SHA-1: `278B6B9DCC5CD5769C2A3148BE24C1D39629F89E`
 ## Test Programs
 - `ARRAY_VAR_TOTAL_TEST.BAS`
   - 配列変数のテストプログラムです。このテストが ALL OK で通ることを確認しています。
@@ -329,5 +329,6 @@ make
 - 2026/08/14 Pico 2 / RP2350 HSTX DVI テキスト出力向けに MSX風 `COLOR` 命令を追加
 - 2026/08/22 Pico 2 / RP2350 HSTX DVI テキスト出力向けにパレット変更・色属性命令を追加
 - 2026/08/23 Pico 2 / RP2350 HSTX DVI で `POKE` によるVRAM・PCG直接書き換え後の画面更新に対応
+- 2026/08/24 Pico 2 / RP2350 HSTX DVI で LIST 後の折り返し複数行編集時の画面更新を修正
 ![Release](https://img.shields.io/github/v/release/IchigoJam/ichigojam-firm)
 ![Downloads](https://img.shields.io/github/downloads/IchigoJam/ichigojam-firm/total)

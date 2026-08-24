@@ -247,6 +247,52 @@ S_INLINE void screen_dirty_row(int y)
 	}
 }
 
+// 指定した範囲の表示行を dirty にする。
+// 折り返し表示されたBASIC行や、行挿入で複数行が変化する場合に使用する。
+S_INLINE void screen_dirty_row_range(int y1, int y2)
+{
+	if (y1 > y2) {
+		int t = y1;
+		y1 = y2;
+		y2 = t;
+	}
+	if (y1 < 0) {
+		y1 = 0;
+	}
+	if (y2 >= SCREEN_H) {
+		y2 = SCREEN_H - 1;
+	}
+	for (int y = y1; y <= y2; y++) {
+		screen_dirty_row(y);
+	}
+}
+
+// カーソル行を含む、折り返し表示された1つの論理行全体を dirty にする。
+// LIST後の編集では、1つのBASIC行が画面上で複数行にまたがる。
+// カーソルのある行だけを dirty にすると、他の折り返し行が再描画されない。
+// 行末が埋まっている行は次の表示行へ継続しているため、上下へたどって範囲を求める。
+S_INLINE void screen_dirty_logical_line(int y)
+{
+	if (y < 0 || y >= SCREEN_H) {
+		return;
+	}
+
+	int y1 = y;
+	int y2 = y;
+
+	// 直前の表示行の右端が空でなければ、その行から現在行へ折り返している。
+	while (y1 > 0 && vram[y1 * SCREEN_W - 1]) {
+		y1--;
+	}
+
+	// 現在行の右端が空でなければ、次の表示行へ折り返している。
+	while (y2 < SCREEN_H - 1 && vram[(y2 + 1) * SCREEN_W - 1]) {
+		y2++;
+	}
+
+	screen_dirty_row_range(y1, y2);
+}
+
 S_INLINE int screen_dirty_any(void)
 {
 	return screen_dirty_rows != 0;
@@ -269,6 +315,8 @@ S_INLINE void screen_dirty_clear_all(void)
 #else
 #define screen_dirty_all()
 #define screen_dirty_row(y)
+#define screen_dirty_row_range(y1, y2)
+#define screen_dirty_logical_line(y)
 #define screen_dirty_any() 1
 #define screen_dirty_test(y) 1
 #define screen_dirty_clear_row(y)
@@ -659,6 +707,10 @@ static void insertLine(int cxlast) {
 //		vram[h * SCREEN_W + j] = 0;
 	if (h < SCREEN_H) // 1.2b33
 		memclear4(v + h * SCREEN_W, SCREEN_W);
+
+	// 行挿入では h 行目以降のVRAMが下方向へ移動する。
+	// dirty行更新では変更された範囲を明示しないと、HSTX DVI側に反映されない。
+	screen_dirty_row_range(h, SCREEN_H - 1);
 }
 /*
 static void memclear2(uint8* mem, int len) {
@@ -669,7 +721,10 @@ static void memclear2(uint8* mem, int len) {
 */
 static void screen_putc(char c) {
 	int dirty_y_before = _g.cursory;
-	screen_dirty_row(dirty_y_before);
+
+	// 編集前の折り返し論理行全体を dirty にする。
+	// 編集で行が短くなった場合、編集後の範囲だけでは消えた下側行が再描画されないため。
+	screen_dirty_logical_line(dirty_y_before);
 //	c = '1'; // test
 //	printf("%d %d\n", _g.cursorx, _g.cursory);
 	
@@ -688,8 +743,9 @@ static void screen_putc(char c) {
 		}
 		_g.screen_locatemode--;
 		_g.uartmode_txd = bk;
-		screen_dirty_row(dirty_y_before);
-		screen_dirty_row(_g.cursory);
+		// LOCATE制御でカーソル位置が変わった場合も、移動前後の論理行全体を再描画する。
+		screen_dirty_logical_line(dirty_y_before);
+		screen_dirty_logical_line(_g.cursory);
 		return;
 	}
 	if (_g.cursory == -1)
@@ -936,8 +992,9 @@ static void screen_putc(char c) {
 				screen_enter();
 		}
 	}
-	screen_dirty_row(dirty_y_before);
-	screen_dirty_row(_g.cursory);
+	// 編集後の折り返し論理行全体を dirty にする。
+	screen_dirty_logical_line(dirty_y_before);
+	screen_dirty_logical_line(_g.cursory);
 }
 S_INLINE void screen_puts(char* s) {
 	while (*s)
