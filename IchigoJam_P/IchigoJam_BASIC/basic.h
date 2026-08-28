@@ -652,6 +652,12 @@ int basic_execute(char *commandline)
 		case TOKEN_END:
 			command_end();
 			break;
+		case TOKEN_STOP:
+			// STOP は構文エラーではなく、実行中断を示す命令。
+			// BASICの実行ループへ ERR_BREAK を返すことで、
+			// "Syntax error in 行番号" ではなく "Break in 行番号" と表示させる。
+			command_error(ERR_BREAK);
+			return BASIC_RESULT_STOP_OR_ERR;
 		case TOKEN_REM_1:
 		case TOKEN_REM_2:
 			command_rem();
@@ -1688,9 +1694,9 @@ static int16 token_expression5()
 		int n = token_opt1();
 		if (n == 0)
 #ifdef PICO_RP2350
-			return IJB_VER * 100 + IJB_BUILD + 27; // Pico 2 / RP2350版識別用: VER() = 16127
+			return IJB_VER * 100 + IJB_BUILD + 28; // Pico 2 / RP2350版識別用: VER() = 16128
 #else
-			return IJB_VER * 100 + IJB_BUILD + 15; // Pico / RP2040版識別用: VER() = 16115
+			return IJB_VER * 100 + IJB_BUILD + 16; // Pico / RP2040版識別用: VER() = 16116
 #endif
 
 		if (n == 3)

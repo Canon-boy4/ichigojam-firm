@@ -2,7 +2,7 @@
 ![Platform](https://img.shields.io/badge/platform-Raspberry%20Pi%20Pico-blue)
 ![Language](https://img.shields.io/badge/language-BASIC-orange)
 ![License](https://img.shields.io/badge/license-IchigoJam-green)
-![Version](https://img.shields.io/badge/version-16127-brightgreen)
+![Version](https://img.shields.io/badge/version-16128-brightgreen)
 ![Status](https://img.shields.io/badge/status-stable-success)
 ## プログラム容量の拡張、配列変数の拡張、外部EEPROM対応の改善、NEC方式の赤外線受信コマンド、環境測定コマンド、カラー表示・パレット変更・色属性コマンドの追加を行い、従来のIchigoJam P BASICの互換性を維持しながら機能強化しています。
 ### Pico 2 / RP2350版の配列領域拡張
@@ -193,20 +193,20 @@ Pico 2 / RP2350版では、増加RAMを利用して配列変数領域 VAR2 を�
 - `PAL n,v` / `PAL RESET` / `PAL(n)` によるRGB332パレット制御
 - `ATTR x,y,a` / `ATTR(x,y)` による画面文字セルの色属性制御
 - 拡張版識別のため `VER()` を変更
-  - Raspberry Pi Pico / RP2040版: `16115`
-  - Raspberry Pi Pico 2 / RP2350版: `16127`
+  - Raspberry Pi Pico / RP2040版: `16116`
+  - Raspberry Pi Pico 2 / RP2350版: `16128`
   - 使用例 BASIC
     - Raspberry Pi Pico / RP2040版:
     ```sh
     ? VER()
-    16115
+    16116
     ? VER(1)
     8
     ```
     - Raspberry Pi Pico 2 / RP2350版:
     ```sh
     ? VER()
-    16127
+    16128
     ? VER(1)
     9
     ```
@@ -259,15 +259,15 @@ make
 ## Raspberry Pi Pico / RP2040 Firmware / Checksum
 ### Raspberry Pi Pico / RP2040用の4K版ファームウェアファイルです。
 - `IchigoJam_P.uf2`
-  - SHA-256: `6F290119F925896602041F9F3A6D4E5E966A5D7A855424FEBC09CBB938215E5E`
-  - MD5: `EBE5EF75F4A9350468FCD01FE41C4498`
-  - SHA-1: `2DDD653B6BE92F7A082F66D29C4EC83D9F008C04`
+  - SHA-256: `9E9B7D4D1E7E776BC3B4F8DE3DE078C1FAEA978F5BBCE3385320402F1F92B396`
+  - MD5: `1865CF3376720FB8050E2158087A2D16`
+  - SHA-1: `72C3A41A9D976858646DFE3103C6973098AAC5C8`
 ## Raspberry Pi Pico 2 / RP2350 Firmware / Checksum
 ### Raspberry Pi Pico 2 / RP2350用の4K版ファームウェアファイルです。
 - `GivetakeJam_P.uf2`
-  - SHA-256: `9828B6704E8E2496F2CD538093F20A9539BB660745E2592DB651954CD6F90088`
-  - MD5: `B853664EEB399E55220F5F17C5BC7F80`
-  - SHA-1: `278B6B9DCC5CD5769C2A3148BE24C1D39629F89E`
+  - SHA-256: `4303F50DF53E733E5CE0894FD1ED0477A86AA587895D83BF7B12C484CEDBC7D5`
+  - MD5: `79251E4597224391DD0FE9F896094B37`
+  - SHA-1: `01849E1EA8BA9B2043B0FEC6379AD15BB0BF5E16`
 ## Test Programs
 - `ARRAY_VAR_TOTAL_TEST.BAS`
   - 配列変数のテストプログラムです。このテストが ALL OK で通ることを確認しています。
@@ -330,5 +330,6 @@ make
 - 2026/08/22 Pico 2 / RP2350 HSTX DVI テキスト出力向けにパレット変更・色属性命令を追加
 - 2026/08/23 Pico 2 / RP2350 HSTX DVI で `POKE` によるVRAM・PCG直接書き換え後の画面更新に対応
 - 2026/08/24 Pico 2 / RP2350 HSTX DVI で LIST 後の折り返し複数行編集時の画面更新を修正
+- 2026/08/28 Pico / RP2040版および Pico 2 / RP2350版で、`STOP` コマンド実行時に `Syntax error in 行番号` ではなく `Break in 行番号` と表示するよう修正
 ![Release](https://img.shields.io/github/v/release/IchigoJam/ichigojam-firm)
 ![Downloads](https://img.shields.io/github/downloads/IchigoJam/ichigojam-firm/total)
