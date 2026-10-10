@@ -2,9 +2,9 @@
 ![Platform](https://img.shields.io/badge/platform-Raspberry%20Pi%20Pico-blue)
 ![Language](https://img.shields.io/badge/language-BASIC-orange)
 ![License](https://img.shields.io/badge/license-IchigoJam-green)
-![Version](https://img.shields.io/badge/version-16128-brightgreen)
+![Version](https://img.shields.io/badge/version-16129-brightgreen)
 ![Status](https://img.shields.io/badge/status-stable-success)
-Extended IchigoJam BASIC for Raspberry Pi Pico with a 4096-byte program area, expanded arrays, improved external EEPROM support, NEC infrared reception, environmental sensing, and color display / palette / attribute commands.
+Extended IchigoJam BASIC for Raspberry Pi Pico with a 4096-byte program area, expanded arrays, improved external EEPROM support, NEC infrared reception, environmental sensing, color display / palette / attribute commands, and program storage on SD cards.
 ## Highlights
 - Full compatibility with IchigoJam BASIC 1.6.1 commands
 - Program size expanded from 1024 bytes to 4096 bytes
@@ -18,7 +18,7 @@ Extended IchigoJam BASIC for Raspberry Pi Pico with a 4096-byte program area, ex
 - Added `IR.IN` command for NEC infrared reception
 - Added `ENV.IN` command for AHT20 + BMP280 environment sensing
 - Fixed `WS.LED` array access for extended arrays and added bounds checking
-- `VER()` returns `16128` on Raspberry Pi Pico 2 / RP2350
+- `VER()` returns `16129` on Raspberry Pi Pico 2 / RP2350
 - Added `COLOR f[,b[,c]]` command for HSTX DVI text colors
 - Added `PAL n,v`, `PAL RESET`, and `PAL(n)` for RGB332 palette control
 - Added `ATTR x,y,a` and `ATTR(x,y)` for text color attribute control
@@ -35,7 +35,7 @@ Extended IchigoJam BASIC for Raspberry Pi Pico with a 4096-byte program area, ex
 ```
 ## Features / Changes
 - Expanded program size from 1024 bytes to 4096 bytes per program
-- Reduced internal storage slots from 100 to 25
+- Internal flash storage: 25 slots on RP2040 and 100 slots on RP2350
 - Extended array variables
   - Original: `[0]..[101]`
   - Extended: RP2040: `[102]..[357]`, RP2350: `[102]..[1125]`
@@ -50,9 +50,11 @@ Extended IchigoJam BASIC for Raspberry Pi Pico with a 4096-byte program area, ex
   -  On the RP2350 build, up to 375 WS2812B LEDs can be driven from array elements `[0]..[1124]`
   - `WS.LED` now reports `Index out of range` when the requested LED count exceeds the available BASIC array range.
 - Improved `FILES` command behavior
-  - `FILES` → internal storage only RP2040(`0..24`), RP2350(`0..99`)
-  - `FILES0` → internal + external EEPROM (`100..131` if detected)
-  - `FILES n` → shows `0..n` and skips unused `25..99`
+  - With SD disabled, `FILES` → internal Flash: RP2040 `0..24`, RP2350 `0..99`
+  - With SD disabled, `FILES0` → internal Flash + responding external EEPROM (`100..131`)
+  - On the tested RP2350 SD build, `SDON` makes `FILES` / `FILES0` list existing SD slots `200..299`
+  - Explicit `FILES n` / `FILES m,n` retain their ranges; unassigned gaps are skipped (including `25..99` on RP2040)
+  - `FILES200,299` lists SD programs without changing the current program or `FILE()`
 - Improved external EEPROM support
   - Detection by I2C address `0x50`
   - Works with `24LC64`, `24LC256`, and `24FC1025`
@@ -61,7 +63,7 @@ Extended IchigoJam BASIC for Raspberry Pi Pico with a 4096-byte program area, ex
 - Added `ENV.IN` command for AHT20 + BMP280 environment sensing
 - Built-in `HELP` memory map updated
 - `VER()` returns `16116` on Raspberry Pi Pico / RP2040
-- `VER()` returns `16128` on Raspberry Pi Pico 2 / RP2350
+- `VER()` returns `16129` on Raspberry Pi Pico 2 / RP2350
 - Platform identification by `VER(1)`
   - Raspberry Pi Pico / RP2040: `8`
   - Raspberry Pi Pico 2 / RP2350: `9`
@@ -83,7 +85,7 @@ IR.IN port,[n]
   - `1` = NEC extended
 ### Example
 ```basic
-10 ' IR.IN Test Program
+10 CLS: ' IR.IN Test Program
 20 IR.IN 1,[0]
 30 LED 0: ' not busy
 40 IF [5]<>0 GOTO 20
@@ -238,7 +240,7 @@ ENV.IN [n]
 - `5` = BMP280 chip ID mismatch
 ### Example
 ```basic
-10 ' ENV.IN Test Program
+10 CLS: ' ENV.IN Test Program
 20 ENV.IN [0]
 30 IF [4]<>0 THEN ? "ERR=";[4]:GOTO 20
 40 T=[0]
@@ -251,6 +253,64 @@ ENV.IN [n]
 110 WAIT 60
 120 GOTO 20
 ```
+
+## SD Card Program Storage
+
+`SDON` initializes the card and checks FAT32. On success, it displays `SD ready (FAT32, 100kHz)`.
+`SDOFF` releases the SD pins and restores OUT1–OUT4 to output LOW. It does not switch off card power. Both commands are available in the same firmware; switching modes does not require reflashing.
+
+SD features have been tested on Pico 2 / RP2350 with HSTX DVI. **RP2040 SD support remains unverified.** The SD code is currently shared and has not been fully separated by processor.
+
+Programs are stored at the top level of the card as `P200.IJB` through `P299.IJB`. Each file contains a **4096-byte binary BASIC program image**, rather than a text `.BAS` file. `Saved` and `Loaded` show the program's used bytes. If an SD load fails, the current program is preserved.
+
+After `SDON`, `FILES` and `FILES0` list existing SD programs. After `SDOFF`, they return to their original Flash / EEPROM behavior. Explicit numbers retain their meaning: `FILES20` lists internal Flash slots 0–20, and `FILES90,220` lists Flash, EEPROM, and SD slots while SD is enabled. Requesting an SD range while SD is disabled returns `File error`. Missing SD files and unassigned slot numbers are omitted.
+
+| Command | Behavior |
+| --- | --- |
+| `SAVE200` … `SAVE299` | Create or overwrite an SD program file |
+| `LOAD200` … `LOAD299` | Read and validate the file before replacing the program in RAM |
+| `LRUN200` … `LRUN299` | Load and run an SD program |
+| `FILES200,299` | List existing SD slots and their first source lines without changing the current program or `FILE()` |
+
+### SD Example
+
+Enter these commands interactively. Choose an unused slot if slot 202 already contains a program.
+
+```basic
+CLS
+SDON
+NEW
+10 CLS
+20 PRINT "SD TEST OK"
+30 END
+SAVE202
+NEW
+LOAD202
+LIST
+RUN
+```
+
+## Version Identification
+
+The original IchigoJam BASIC version remains **1.6.1**. The final two digits of `VER()` identify the extension revision.
+
+| Platform | `VER()` | `VER(1)` |
+| --- | --- | --- |
+| Raspberry Pi Pico / RP2040 | `16116` | `8` |
+| Raspberry Pi Pico 2 / RP2350 | `16129` | `9` |
+
+Example for Pico 2:
+
+```basic
+CLS
+? VER()
+? VER(1)
+```
+
+Expected output: `16129`, then `9`.
+
+---
+
 ## Build Environment
 Create the build environment inside the `IchigoJam_P` directory.
 ### Required tools
@@ -302,6 +362,10 @@ Copy the following files from the `GivetakeJam_P` directory into the correspondi
   - `i2ceeprom.h`
   - `storage.h`
   - `io.h`
+  - `all_includes.h` (SD integration)
+  - `sd_card.h` (SD driver with Japanese comments)
+- Root `CMakeLists.txt`: link `hardware_spi` for SD support
+
 Then build as usual. When `IchigoJam_P.uf2` is generated, write it to the Pico.
 ## Raspberry Pi Pico / RP2040 Firmware / Checksum
 ### Write this firmware to Raspberry Pi Pico / RP2040.
@@ -312,9 +376,9 @@ Then build as usual. When `IchigoJam_P.uf2` is generated, write it to the Pico.
 ## Raspberry Pi Pico 2 / RP2350 Firmware / Checksum
 ### Write this firmware to Raspberry Pi Pico 2 / RP2350.
 - `GivetakeJam_P.uf2`
-  - `SHA-256`: `4303F50DF53E733E5CE0894FD1ED0477A86AA587895D83BF7B12C484CEDBC7D5`
-  - `MD5`: `79251E4597224391DD0FE9F896094B37`
-  - `SHA-1`: `01849E1EA8BA9B2043B0FEC6379AD15BB0BF5E16`
+  - `SHA-256`: `BD0EF15406638837090A0601BEACAA81EB844351032D8C63F642C9280D58FF07`
+  - `MD5`: `67FC2EAE67F16C0A360042C6921FC585`
+  - `SHA-1`: `A4B501EA4F84E54EEDCD5D306F7EC4E4AC5AE980`
 ## Test Programs
 - `ARRAY_VAR_TOTAL_TEST.BAS`
   - Comprehensive array-variable test
@@ -348,9 +412,13 @@ Then build as usual. When `IchigoJam_P.uf2` is generated, write it to the Pico.
 The program displays the selected color number, its RGB332 value, the decoded R/G/B components, foreground samples, and background samples.
 Use the cursor keys to select a color number and change the palette value.
 Press `R` to restore the default firmware palette with `PAL RESET`.
+
+### SD Card Expansion Board Circuit
+![SD card expander PCB](./docs/MSD_MemCard.png)
+
 ## Known Limitations / Notes
 - Program size is limited to 4096 bytes
-- Internal storage provides 25 slots
+- Internal flash storage provides 25 slots on RP2040 and 100 slots on RP2350
 - External EEPROM display range is fixed to `100..131`
   - `24LC64` → 2 slots
   - `24LC256` → 8 slots
@@ -362,6 +430,16 @@ Press `R` to restore the default firmware palette with `PAL RESET`.
 - Labels ending with digits may cause syntax errors
 - Division is integer-only
 - For stable IR reception, repeat filtering is recommended in BASIC
+- SD card access
+  - SD program slots are limited to 200–299 (100 programs). This range is defined by the firmware, rather than by SD card capacity or RAM size. Supporting more slots requires firmware changes.
+
+  - Initialization and transfers are fixed at **100kHz** based on prototype results. SD uses polling rather than DMA and does not disable interrupts across initialization/transfers. SDON reserves GP8–GP11; conflicting OUT/PWM/CLO operations return File error. Normal boot OUT=LOW behavior is retained. UART uses GP0/GP1. The inverted-CS board is not interchangeable with a generic direct-CS module.
+
+  - Supported cards use FAT32 with 512-byte sectors. The FAT32 volume may be inside an MBR primary partition or occupy the whole card without a partition table. Programs are saved at the top level of the card, outside folders, using names with up to eight characters and extensions with up to three characters: `P200.IJB` through `P299.IJB`. FAT12/FAT16, exFAT, GPT, extended partitions, subfolders and root-directory growth are not implemented. Root scans stop at 256 sectors / 32 clusters. Overwritten existing files are limited to 4096 bytes / 8 clusters.
+
+  - Sector reads verify CRC16. SAVE writes new clusters, reads back and compares every sector, changes the directory, then frees the old chain. If power is lost or the card is removed during SAVE, the program file or the card's file-management information may be damaged. Do not switch off power or remove the card until saving is complete, and back up important data. Without an RTC, file dates use 1980-01-01.
+
+
 ## License
 Copyright 2014-2025 the IchigoJam authors. All rights reserved.
 MIT license.
@@ -386,3 +464,4 @@ Givetakewinwin
 - Updated on 2026-08-23 for Raspberry Pi Pico 2 / Refresh HSTX DVI display after `POKE` writes to VRAM and PCG.
 - Updated on 2026-08-24 for Raspberry Pi Pico 2 / Refreshes all wrapped display rows when editing long listed lines.
 - Updated on 2026-08-28 for Raspberry Pi Pico / RP2040 and Raspberry Pi Pico 2 / RP2350 / Fixed `STOP` command to report `Break in line` instead of `Syntax error in line`.
+- Updated on 2026-10-11: Added `SDON` and `SDOFF` for program storage on SD cards.

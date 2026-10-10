@@ -65,6 +65,7 @@ target_link_libraries(IchigoJam_P PUBLIC
     hardware_pwm
     hardware_pio
     hardware_clocks
+    hardware_spi
     hardware_i2c
     hardware_exception
 )

@@ -3,19 +3,21 @@
 
 ![Platform](https://img.shields.io/badge/platform-Raspberry%20Pi%20Pico-blue)
 ![Language](https://img.shields.io/badge/language-BASIC-orange)
-![Version](https://img.shields.io/badge/VER()-16128-brightgreen)
+![Version](https://img.shields.io/badge/VER()-16129-brightgreen)
 ![Status](https://img.shields.io/badge/status-stable-success)
 
 ## Overview / 概要
 
 **GivetakeJam BASIC** is an extended version of IchigoJam BASIC for Raspberry Pi Pico.
 
-This firmware enhances program capacity, expands array variables, improves external EEPROM handling, and adds NEC infrared reception, environmental sensing, and color display / palette / attribute commands while maintaining compatibility with the original IchigoJam BASIC design.
+This firmware enhances program capacity, expands array variables, improves external EEPROM handling, and adds NEC infrared reception, environmental sensing, color display / palette / attribute commands, and program storage on SD cards while maintaining compatibility with the original IchigoJam BASIC design.
 
 **GivetakeJam BASIC** は Raspberry Pi Pico 向け IchigoJam BASIC の拡張版です。  
-プログラム容量の拡張、配列変数の拡張、外部 EEPROM 対応の改善、NEC 赤外線受信コマンド、環境測定コマンド、カラー表示・パレット変更・色属性コマンドの追加を行い、従来の IchigoJam BASIC との互換性を維持しています。
+プログラム容量の拡張、配列変数の拡張、外部 EEPROM 対応の改善、NEC 赤外線受信コマンド、環境測定コマンド、カラー表示・パレット変更・色属性コマンドの追加、およびSDカードへのプログラムの保存機能の追加を行い、従来の IchigoJam BASIC との互換性を維持しています。
 
 ## Version / バージョン
+
+The original IchigoJam BASIC version remains **1.6.1**. The current extension identifiers are `16116` for RP2040 and `16129` for RP2350.
 
 - `16100` : original base version
 - `16112` : infrared receiver build
@@ -31,6 +33,7 @@ This firmware enhances program capacity, expands array variables, improves exter
 - `16127` : RP2350 build refreshes all wrapped display rows when editing long listed lines.
 - `16116` : RP2040 build fixed `STOP` command to report `Break in line` instead of `Syntax error in line`.
 - `16128` : RP2350 build fixed `STOP` command to report `Break in line` instead of `Syntax error in line`.
+- `16129` : Added `SDON` and `SDOFF` for program storage on SD cards (Pico 2 / RP2350 hardware tested; RP2040 SD support unverified).
 
 ## Highlights / 主な特徴
 
@@ -44,6 +47,7 @@ This firmware enhances program capacity, expands array variables, improves exter
 - `COLOR` MSX-style text color command for RP2350 HSTX DVI output
 - External EEPROM support (`24LC64` / `24LC256` / `24FC1025`)
 - RP2350 build: default keyboard layout is Japanese when the keyboard setting flash area is unset.
+- SD expansion: FAT32 program slots `200..299`, 4096 bytes per file, 100kHz SPI, and runtime `SDON` / `SDOFF` switching. Pico 2 / RP2350 hardware tested; RP2040 SD support remains unverified.
 
 ## Memory Map / メモリーマップ
 
@@ -71,6 +75,9 @@ This firmware enhances program capacity, expands array variables, improves exter
 ### COLOR command used game
 ![BASIC Game](./docs/IMG_4685up.png)
 ![BASIC Game](./docs/IMG_4690up.png)
+
+### SD Card Expansion Board Circuit
+![SD Card Expansion Board Circuit](./docs/MSD_MemCard.png)
 
 ## Main Documents
 

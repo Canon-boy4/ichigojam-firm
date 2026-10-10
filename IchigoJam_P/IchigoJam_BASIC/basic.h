@@ -64,6 +64,8 @@ static int basic_execute(char *commandline);
 S_INLINE void basic_init();
 S_INLINE int basic_listSize();
 
+// SDON/SDOFF命令。端子の切り替えは同じファームウェア内で行う。
+static void command_sd(int enable);
 static int IJB_save(int n, uint8 *list, int size);								// 0:ok
 static int IJB_load(int n, uint8 *list, int sizelimit, int init); // ret:size if:-1 _g.err
 static int i2c0_init();																						/* Initialize I2C module  0:ok 1:_g.err */
@@ -744,6 +746,12 @@ int basic_execute(char *commandline)
 			break;
 			// 100
 
+		case TOKEN_SDON:
+			command_sd(1);
+			break;
+		case TOKEN_SDOFF:
+			command_sd(0);
+			break;
 		case TOKEN_SLEEP:
 			command_sleep();
 			break;
@@ -1694,7 +1702,7 @@ static int16 token_expression5()
 		int n = token_opt1();
 		if (n == 0)
 #ifdef PICO_RP2350
-			return IJB_VER * 100 + IJB_BUILD + 28; // Pico 2 / RP2350版識別用: VER() = 16128
+			return IJB_VER * 100 + IJB_BUILD + 29; // Pico 2 / RP2350版識別用: VER() = 16129 <<Ver29より SDカード対応となる。>>
 #else
 			return IJB_VER * 100 + IJB_BUILD + 16; // Pico / RP2040版識別用: VER() = 16116
 #endif
@@ -3265,11 +3273,33 @@ void command_load(int command)
 	token_end();
 	IJB_ERR_CHK();
 
-	memclear4((uint8 *)list, IJB_SIZEOF_LIST);
-	_g.listsize = 0;
-	pc = pcbreak = NULL;
-
-	int16 s = IJB_load(n, (uint8 *)list, IJB_SIZEOF_LIST - 2, 1);
+	int16 s;
+	if (n >= 200 && n <= 299)
+	{
+		// SDから一時領域へ読んで検査する。成功するまで現在のプログラムを消さない。
+		s = sd_prepare_program(n);
+		if (s < 0)
+		{
+			put_str("SD file error "); put_num(sd_file_error); put_chr('\n');
+			command_error(ERR_FILE_ERROR);
+			return;
+		}
+		memclear4((uint8 *)list, IJB_SIZEOF_LIST);
+		memcpy((uint8 *)list, sd_file_data, s);
+		_g.listsize = 0;
+		_g.lastfile = n;
+		pc = pcbreak = NULL;
+#ifdef TOKEN_CACHE
+		lasttokenpc = NULL;
+#endif
+	}
+	else
+	{
+		memclear4((uint8 *)list, IJB_SIZEOF_LIST);
+		_g.listsize = 0;
+		pc = pcbreak = NULL;
+		s = IJB_load(n, (uint8 *)list, IJB_SIZEOF_LIST - 2, 1);
+	}
 	//	int16 s = IJB_load(n, list, IJB_SIZEOF_LIST);
 	if (s >= 0)
 	{
@@ -3338,7 +3368,23 @@ S_INLINE void command_save()
 	token_end();
 	IJB_ERR_CHK();
 
-	if (!IJB_save(n, (uint8 *)list, _g.listsize))
+
+ // SD保存番号はSD処理へ、それ以外は従来のFlash/EEPROM処理へ渡す。
+ int result;
+ if(n>=200 && n<=299) {
+  result=sd_save_program(n,(const uint8_t *)list,(unsigned)_g.listsize)?0:1;
+  if(!result)_g.lastfile=n;
+  else {
+   if(sd_write_error) {
+    put_str("SD write error ");put_num(sd_write_error);
+    put_str(" R1=");put_num(sd_write_r1);
+    put_str(" RESPONSE=");put_num(sd_write_response);put_chr('\n');
+   } else {put_str("SD file error ");put_num(sd_file_error);put_chr('\n');}
+   if(sd_save_committed)put_str("File committed; cleanup failed\n");
+   else if(sd_save_commit_started)put_str("Directory update uncertain\n");
+  }
+ } else result=IJB_save(n,(uint8 *)list,_g.listsize);
+ if (!result)
 	{
 		if (!noresmode)
 		{
@@ -3378,6 +3424,23 @@ int16 bk_startn_files = 0;
 int16 bk_endn_files = 0;
 #endif
 
+
+// SD一覧は保存済み番号だけ表示し、BASICプログラムと直前のファイル番号は変えない。
+static int sd_files_print_row(int number) {
+ char preview[SCREEN_W];
+ int status=sd_files_preview(number,preview,sizeof(preview));
+ if(status<0){put_str("SD file error ");put_num(sd_file_error);put_chr('\n');command_error(ERR_FILE_ERROR);return -1;}
+ if(!status)return 0;
+ int width=put_num(number);put_chr(' ');
+ if(status==2)put_str("[empty]");
+ else if(status==3)put_str("[invalid]");
+ else {
+  int limit=SCREEN_W-3-width;if(limit<0)limit=0;
+  preview[limit]=0;put_str(preview);
+ }
+ put_chr('\n');return 1;
+}
+
 S_INLINE void command_files()
 {
 #ifdef IJB_DONT_LOOP
@@ -3385,25 +3448,18 @@ S_INLINE void command_files()
 #endif
 
 	/*
-	 * ===== MODIFIED =====
-	 * Default behavior:
-	 *   FILES      -> show internal Flash only (0 .. N_FLASH_STORAGE-1)
-	 *   FILES0     -> show internal + external EEPROM (100 .. 131) if EEPROM exists
-	 *   FILES30    -> show up to 30
-	 *
-	 * In this 4KB version:
-	 *   internal storage = 0 .. 24
-	 *   external display = 100 .. 131
-	 *
-	 * External EEPROM existence is checked by I2C address 0x50 ACK,
-	 * not by i2c0_init() return value.
+	 * FILES/FILES0：SDON中はSD200～299。SDOFF中は従来のFlash/EEPROM一覧。
+	 * 内蔵スロット数はN_FLASH_STORAGEに従う。番号/範囲の明示指定は従来どおり。
+	 * EEPROMの存在確認はI2Cアドレス0x50へのACKで判定する。
 	 */
 
-	int16 endn = N_FLASH_STORAGE - 1; // default: internal Flash only
-	int16 startn = 0;
+	// SDON中の省略形はSD一覧。番号/範囲を明示した場合は指定先を表示する。
+	int16 endn = sd_initialized ? 299 : N_FLASH_STORAGE - 1;
+	int16 startn = sd_initialized ? 200 : 0;
 
 	if (token_getChar())
 	{
+		startn = 0; // 明示した単独番号/範囲は従来の意味を維持する
 		endn = token_expression();
 		IJB_ERR_CHK();
 
@@ -3413,31 +3469,27 @@ S_INLINE void command_files()
 		{
 			token_back();
 
-			/*
-			 * ===== MODIFIED =====
-			 * Special case: FILES0
-			 *
-			 * If an external EEPROM responds at I2C address 0x50,
-			 * show external file numbers 100 .. 131.
-			 * Otherwise, keep internal-only display.
-			 */
+			/* FILES0：SDON中はSD一覧、SDOFF中は応答するEEPROMも含める。 */
 			if (endn == 0)
 			{ // ver 1.2.4
-				if (i2c_eeprom_exists())
+				if (sd_initialized)
 				{
-					endn = 100 + 32 - 1; // fixed external display range: 100..131
+					startn = 200;
+					endn = 299;
+				}
+				else if (i2c_eeprom_exists())
+				{
+					endn = 100 + 32 - 1; // EEPROMの表示番号は100～131に固定
 				}
 				else
 				{
-					endn = N_FLASH_STORAGE - 1; // internal only
+					endn = N_FLASH_STORAGE - 1; // 内蔵Flashだけ表示
 				}
 			}
 		}
 		else
 		{
-			/*
-			 * FILES m,n
-			 */
+			/* FILES m,n：始点と終点を明示する。 */
 			startn = endn;
 			endn = token_expression();
 			IJB_ERR_CHK();
@@ -3447,29 +3499,35 @@ S_INLINE void command_files()
 	token_end();
 	IJB_ERR_CHK();
 
+	if (startn <= endn && endn >= 200 && startn <= 299)
+	{
+		if (!sd_files_build_index())
+		{
+			put_str("SD file error "); put_num(sd_file_error); put_chr('\n');
+			command_error(ERR_FILE_ERROR);
+			return;
+		}
+	}
 	int cnt = 0;
 	int16 buf[16];
 
 	for (int i = startn; i <= endn; i++)
 	{
-		/*
-		 * ===== MODIFIED =====
-		 * Skip unused gap between internal and external numbering.
-		 *
-		 * Internal: 0 .. 24
-		 * Gap     : 25 .. 99
-		 * External: 100 ..
-		 */
+		/* 内蔵Flashの末尾からEEPROM開始100までの未割り当て番号を飛ばす。 */
 		if (i >= N_FLASH_STORAGE && i < 100)
 			continue;
 
-		/*
-		 * ===== MODIFIED =====
-		 * External display range is fixed to 100 .. 131.
-		 * Do not display numbers 132 or higher.
-		 */
-		if (i >= 132)
+		/* EEPROM100～131とSD200～299の間、およびSD末尾以降の未割り当て番号を飛ばす。 */
+		if (i >= 132 && (i < 200 || i > 299))
 			continue;
+		if (i >= 200)
+		{
+			int row = sd_files_print_row(i);
+			if (row < 0) return;
+			if (!row) continue;
+		}
+		else
+		{
 
 		int res = IJB_load(i, (uint8 *)buf, SCREEN_W /*32*/, 0);
 
@@ -3489,6 +3547,7 @@ S_INLINE void command_files()
 			}
 		}
 		put_chr('\n');
+		}
 
 		cnt++;
 		if (cnt >= SCREEN_H - 2)
@@ -3533,24 +3592,21 @@ int command_files_next()
 
 	for (int i = startn; i <= endn; i++)
 	{
-		/*
-		 * ===== MODIFIED =====
-		 * Skip unused gap between internal and external numbering.
-		 *
-		 * Internal: 0 .. 24
-		 * Gap     : 25 .. 99
-		 * External: 100 ..
-		 */
+		/* 内蔵Flashの末尾からEEPROM開始100までの未割り当て番号を飛ばす。 */
 		if (i >= N_FLASH_STORAGE && i < 100)
 			continue;
 
-		/*
-		 * ===== MODIFIED =====
-		 * External display range is fixed to 100 .. 131.
-		 * Do not display numbers 132 or higher.
-		 */
-		if (i >= 132)
+		/* EEPROM100～131とSD200～299の間、およびSD末尾以降の未割り当て番号を飛ばす。 */
+		if (i >= 132 && (i < 200 || i > 299))
 			continue;
+		if (i >= 200)
+		{
+			int row = sd_files_print_row(i);
+			if (row < 0) { continue_files = 0; return 0; }
+			if (!row) continue;
+		}
+		else
+		{
 
 		int b = put_num(i);
 
@@ -3570,6 +3626,7 @@ int command_files_next()
 			}
 		}
 		put_chr('\n');
+		}
 
 		cnt++;
 		if (cnt >= SCREEN_H - 2)
@@ -3581,10 +3638,7 @@ int command_files_next()
 				return 0;
 			}
 
-			/*
-			 * ===== MODIFIED =====
-			 * Save current position so next call resumes correctly.
-			 */
+			/* 次回呼び出しで一覧を再開できるよう、表示位置を保存する。 */
 			bk_startn_files = i;
 			return 1;
 		}
@@ -5887,3 +5941,44 @@ S_INLINE void command_dac()
 
 // __BASIC_H__
 #endif
+
+
+// BASICのput_numは小さい数値用なので、セクター番号などの32ビット値を別に表示する。
+static void sd_put_u32(uint32_t n) {
+ char digits[10]; unsigned count=0;
+ do { digits[count++]=(char)('0'+n%10u); n/=10u; } while(n);
+ while(count) put_chr(digits[--count]);
+}
+// 読み取り失敗時のセクター番号・応答・CRC診断を表示する。
+static void sd_print_read_error(void) {
+ put_str("SD read error "); put_num(sd_read_error);
+ put_str(" LBA="); sd_put_u32(sd_read_lba);
+ put_str(" R1="); put_num(sd_read_r1);
+ put_str(" TOKEN="); put_num(sd_read_token); put_chr('\n');
+ if(sd_read_error==15) {
+  put_str("CRC received="); sd_put_u32(sd_read_crc_wire);
+  put_str(" calculated="); sd_put_u32(sd_read_crc_calc); put_chr('\n');
+ }
+}
+
+// SDONはカード/FAT32の準備だけ行う。SDTEST.TXTの診断表示は通常動作から外す。
+// 失敗時は原因番号を表示する。SDOFFは既存のOUT出力LOW状態へ戻す。
+static void command_sd(int enable) {
+ token_end(); if (_g.err) return;
+ if (!enable) { sd_card_off(); return; }
+ int result=sd_card_on();
+ if(result) {
+  put_str("SD init error "); put_num(result); put_chr('\n');
+  command_error(ERR_FILE_ERROR); return;
+ }
+ if(!sd_fat32_probe()) {
+  if(sd_read_error) sd_print_read_error();
+  else {
+   put_str("SD FS error "); put_num(sd_fs_error);
+   if(sd_fs_kind) { put_str(" FAT="); put_num(sd_fs_kind); }
+   put_chr('\n');
+  }
+  sd_card_off(); command_error(ERR_FILE_ERROR); return;
+ }
+ put_str("SD ready (FAT32, 100kHz)\n");
+}

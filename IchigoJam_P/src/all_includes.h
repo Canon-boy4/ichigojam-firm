@@ -21,6 +21,8 @@
 #include "hardware/clocks.h"
 #include "hardware/structs/scb.h"
 #include "hardware/i2c.h"
+// SDK定義の後、BASIC命令定義の前にSDドライバーを読み込む。<< Ver29よりSDカード対応 >>
+#include "sd_card.h"
 
 // pico-extras
 

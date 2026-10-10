@@ -58,6 +58,10 @@ void IJB_pwm(int port, int plen, int len) {
         plen = PLEN_MAX;
     }
     uint8 pin = out_pins[port - 1];
+    // SDON中はSPI用のGP8～GP11をPWMなどで再設定しない。<< Ver29よりSDカード対応 >>
+    if (sd_pins_reserved && pin >= 8 && pin <= 11) {
+        command_error(ERR_FILE_ERROR); return;
+    }
     gpio_set_function(pin, GPIO_FUNC_PWM);
     uint slice_num = pwm_gpio_to_slice_num(pin);
 
@@ -88,6 +92,8 @@ ANA 指定しない
 */
 
 void io_init() {
+    // CLOによる一括初期化でSD通信のピン設定を壊さない。
+    if (sd_pins_reserved) { command_error(ERR_FILE_ERROR); return; }
     adc_init();
     for (int i = 0; i < 4; i++) {
         uint8 pin = in_pins[i];
@@ -160,6 +166,11 @@ int IJB_in() {
 void IJB_out(int port, int st) {
     if (!(0 <= port && port <= IO_PIN_NUM)) {
         return;
+    }
+    // SDON中はOUT一括操作またはSDが使用するOUT1～OUT4への操作を拒否する。
+    if (sd_pins_reserved && (port == 0 ||
+        (port >= 1 && port <= IO_PIN_NUM && out_pins[port-1] >= 8 && out_pins[port-1] <= 11))) {
+        command_error(ERR_FILE_ERROR); return;
     }
     if (port == 0) {
         for (int i = 0; i < IO_PIN_NUM; i++) {
