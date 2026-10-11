@@ -2,8 +2,8 @@
 ![Platform](https://img.shields.io/badge/platform-Raspberry%20Pi%20Pico-blue)
 ![Language](https://img.shields.io/badge/language-BASIC-orange)
 ![License](https://img.shields.io/badge/license-IchigoJam-green)
-![Version](https://img.shields.io/badge/version-16129-brightgreen)
-![Status](https://img.shields.io/badge/status-stable-success)
+![Version](https://img.shields.io/badge/version-16130-brightgreen)
+![Status](https://img.shields.io/badge/status-RP2350%20hardware%20tested-success)
 ## プログラム容量の拡張、配列変数の拡張、外部EEPROM対応の改善、NEC方式の赤外線受信コマンド、環境測定コマンド、カラー表示・パレット変更・色属性コマンドの追加、およびSDカードへのプログラム保存機能追加を行い、従来のIchigoJam P BASICの互換性を維持しながら機能強化しています。
 ### Pico 2 / RP2350版の配列領域拡張
 Pico 2 / RP2350版では、増加RAMを利用して配列変数領域 VAR2 を拡張しています。
@@ -193,8 +193,16 @@ Pico 2 / RP2350版では、増加RAMを利用して配列変数領域 VAR2 を�
   - 使用例 プログラム ENV_IN_TEST.BAS
 
 - SDカードへのプログラム保存機能を追加
-  - SDON 命令 : カード初期化・FAT32確認。成功時は `SD ready (FAT32, 100kHz)`
-  - SDOFF 命令 : SD端子を解放しOUT1～OUT4を出力LOWへ復帰。カード電源は切りません。
+  - `SDON` 命令 : カード初期化・FAT32確認。成功時は `SD ready (FAT32, 100kHz)`
+  - `SDOFF` 命令 : CSをHIGHにしてからIN3を内部プルアップ付き入力へ戻し、OUT1～OUT4を出力LOWへ復帰。カード電源は切りません。
+
+  | 命令 | 機能 |
+| --- | --- |
+| `SAVE200`～`SAVE299` | SDへの新規保存・上書き保存 |
+| `LOAD200`～`LOAD299` | 読み取り・形式検査後にRAMのプログラムを置き換え |
+| `LRUN200`～`LRUN299` | SDから読み込んで実行 |
+| `FILES200,299` | SDの保存済み番号と先頭行を一覧表示 |
+
   - 使用例 BASIC
     ```basic
     CLS
@@ -212,16 +220,10 @@ Pico 2 / RP2350版では、増加RAMを利用して配列変数領域 VAR2 を�
   - 今回のSD実機確認は **Pico 2 / RP2350・HSTX DVI版** が対象です。RP2040でのSD対応は未検証です。SD処理は現在共通ソースに追加されており、機種別の完全分離は行っていません。
   - カード最上位の `P200.IJB`～`P299.IJB` に保存します。各ファイルは **4096バイトのバイナリ内部形式** で、テキストの `.BAS` とは異なります。Saved／Loaded表示はプログラム使用量です。SD読み込み失敗時は現在のプログラムを保持します。
   - SDON中のFILES／FILES0はSD一覧、SDOFF中は従来のFlash／EEPROM表示です。番号や範囲を明示すると指定先を表示し、FILES20は内蔵Flashの0～20、FILES90,220はSDON中にFlash・EEPROM・SDをまとめて表示します。SDOFF中にSD範囲を指定するとFile errorです。SD未保存番号と未割り当て番号は省略します。
-| 命令 | 機能 |
-| --- | --- |
-| `SAVE200`～`SAVE299` | SDへの新規保存・上書き保存 |
-| `LOAD200`～`LOAD299` | 読み取り・形式検査後にRAMのプログラムを置き換え |
-| `LRUN200`～`LRUN299` | SDから読み込んで実行 |
-| `FILES200,299` | SDの保存済み番号と先頭行を一覧表示 |
 
 - 拡張版識別のため `VER()` を変更
   - Raspberry Pi Pico / RP2040版: `16116`
-  - Raspberry Pi Pico 2 / RP2350版: `16129`
+  - Raspberry Pi Pico 2 / RP2350版: `16130`
   - 使用例 BASIC
     - Raspberry Pi Pico / RP2040版:
     ```sh
@@ -233,7 +235,7 @@ Pico 2 / RP2350版では、増加RAMを利用して配列変数領域 VAR2 を�
     - Raspberry Pi Pico 2 / RP2350版:
     ```sh
     ? VER()
-    16129
+    16130
     ? VER(1)
     9
     ```
@@ -241,7 +243,7 @@ Pico 2 / RP2350版では、増加RAMを利用して配列変数領域 VAR2 を�
     - Raspberry Pi Pico / RP2040版: `8`
     - Raspberry Pi Pico 2 / RP2350版: `9`
 ---
-#  IchigoJam P BASICのソースコードを変更して４K版にしたものです。よって、まずはIchigoJam P BASICがコンパイルできる環境を作成します。
+#  IchigoJam P BASICのソースコードを変更して４K版にしたものです。よって、まずはIchigoJam P BASICがコンパイルできる環境を作成します。(RP2040版のビルド説明)
 ## 環境構築
 - "CMake"と"GCC"をインストールする
 ## IchigoJam_P のコンパイル環境
@@ -286,6 +288,24 @@ make
   - `sd_card.h`（日本語コメント付きSDドライバー）
 - ルートの `CMakeLists.txt`：SD用 `hardware_spi` のリンク設定
 - IchigoJam P の時の様にビルドして、`IchigoJam_P.uf2`ファイルが作成できたらPicoに書き込みます。
+---
+## RP2350版のビルド（Raspberry Pi Pico 2／macOS）
+
+RP2350版はHSTX DVIを使用するため、PicoDVIライブラリは使用しません。
+上記のRP2040用ライブラリ設定とは別に、RP2350用の
+`pico-sdk-rp2350`、`pico-extras-rp2350` とArm GNU Toolchainを用意します。
+
+リポジトリ最上位のフォルダーから、次を実行します。
+
+```sh
+cd IchigoJam_P
+./build_pico2_mac.sh
+```
+
+ビルドに成功すると、`IchigoJam_P/build-pico2/IchigoJam_P.uf2`
+が生成されます。このファイルをPico 2へ書き込みます。
+
+配布用には、このUF2を `GivetakeJam_P.uf2` という名前で保存しています。
 ## Raspberry Pi Pico / RP2040 Firmware / Checksum
 ### Raspberry Pi Pico / RP2040用の4K版ファームウェアファイルです。
 - `IchigoJam_P.uf2`
@@ -293,11 +313,12 @@ make
   - MD5: `1865CF3376720FB8050E2158087A2D16`
   - SHA-1: `72C3A41A9D976858646DFE3103C6973098AAC5C8`
 ## Raspberry Pi Pico 2 / RP2350 Firmware / Checksum
-### Raspberry Pi Pico 2 / RP2350用の4K版ファームウェアファイルです。
+### Raspberry Pi Pico 2/ RP2350用の4K版ファームウェアファイルです。
 - `GivetakeJam_P.uf2`
-  - SHA-256: `BD0EF15406638837090A0601BEACAA81EB844351032D8C63F642C9280D58FF07`
-  - MD5: `67FC2EAE67F16C0A360042C6921FC585`
-  - SHA-1: `A4B501EA4F84E54EEDCD5D306F7EC4E4AC5AE980`
+  - SHA-256: `F64CEEB28BCBE274E6EA3DA329590D4A67A3FF924AABC2E8CBCAFD36B56E51E2`
+  - MD5: `C890CF1365426FBE0A5D994A445ED5A6`
+  - SHA-1: `D917DE20A65255F7B7851C86528B24B83C94E942`
+
 ## Test Programs
 - `ARRAY_VAR_TOTAL_TEST.BAS`
   - 配列変数のテストプログラムです。このテストが ALL OK で通ることを確認しています。
@@ -321,17 +342,14 @@ make
 ### COLOR コマンド使用画面 ( ICHIGO EATER COLOR画面 )
 ![screenshot](./docs/IMG_4685up.png)
 ![screenshot](./docs/IMG_4690up.png)
-
 ### PAL RGB332 変更サンプル
 ![screenshot](./docs/IMG_4984up.png)
-
 `PAL_RGB332_CHANGE.BAS` は、RP2350 HSTX DVI 版の RGB332 パレットを確認・変更するためのサンプルプログラムです。
-
 選択中の色番号、RGB332値、R/G/B成分、前景色サンプル、背景色サンプルを表示します。
 カーソルキーで色番号の選択とパレット値の変更を行います。
 `R` キーで `PAL RESET` を実行し、ファームウェア内蔵のデフォルトパレットに戻します。
 ### SDカード拡張基板回路例
-![SD card expander PCB](./docs/MSD_MemCard.png)
+![SD card expander PCB](./docs/MSD_MemCard101.png)
 ## ライセンス / license
     - Copyright 2014-2025 the IchigoJam authors. All rights reserved. MIT license.  https://ichigojam.net/license
 ## 商標 / Trademark
@@ -353,7 +371,7 @@ make
 - IR受信を安定させるため、BASIC側で repeat 除外を推奨します
 - SDカードへのアクセス機能
   - 保存番号は200～299の100本です。これはファームウェアで設定した範囲で、SDカードの容量やRAM容量による制限ではありません。保存本数を増やすには、ファームウェアの変更が必要です。
-  - 試作基板の結果に基づき、初期化・通信とも **100kHz** に固定しています。ポーリング方式でDMAを使わず、SD処理全体で割り込みを禁止しません。SDON中はGP8～GP11を予約し、競合するOUT／PWM／CLO操作はFile errorです。通常起動時のOUTポートがLOWのため、一般的なCS直結モジュールとは制御極性が逆になっています。
+  - 試作基板の結果に基づき、初期化・通信とも **100kHz** に固定しています。ポーリング方式でDMAを使わず、SD処理全体で割り込みを禁止しません。SDON中はGP6とSPIのGP8・GP10・GP11を予約し、競合するOUT／PWM／IR.IN／CLO操作はFile errorです。SDON中はIN3をCS制御用の出力端子として使用します。IN(3)はCSのHIGH／LOWを返すため、外部信号の入力には使えません。
   - FAT32形式で、1セクターが512バイトのSDカードに対応します。MBR方式で区切った基本パーティション内のFAT32領域、またはパーティションを区切らずカード全体をFAT32にした構成を読み書きできます。プログラムはフォルダーの中ではなく、カードを開いた最上位の場所に保存します。ファイル名は、名前が最大8文字・拡張子が最大3文字の形式で、`P200.IJB`～`P299.IJB`を使用します。FAT12/FAT16・exFAT・GPT・拡張パーティション・サブフォルダー・ルート自動拡張は未対応です。ルート探索は256セクター／32クラスタ、既存の上書き対象は4096バイト／8クラスタまでです。
   - 読み取りCRCを検査します。保存は新規クラスタへ書いて各セクターを読み戻し照合した後、参照先を更新し旧領域を解放します。ただし、保存の途中で電源が切れたりカードが抜けたりすると、プログラムファイルやカード上のファイル管理情報が破損する可能性があります。保存中は電源を切ったりカードを抜いたりせず、重要なデータはバックアップしてください。RTC未使用のためファイル日付は1980-01-01です。
 ---
@@ -369,3 +387,4 @@ make
 - 2026/08/24 Pico 2 / RP2350 HSTX DVI で LIST 後の折り返し複数行編集時の画面更新を修正
 - 2026/08/28 Pico / RP2040版および Pico 2 / RP2350版で、`STOP` コマンド実行時に `Syntax error in 行番号` ではなく `Break in 行番号` と表示するよう修正
 - 2026/10/11 SDカードによるプログラム保存ができるように `SDON` と `SDOFF` を追加
+- 2026/10/11 16130版：CSをIN3／GP6の直結方式に変更。10kΩプルアップを残してMOSFETを省略。

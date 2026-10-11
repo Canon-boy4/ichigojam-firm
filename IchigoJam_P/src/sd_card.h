@@ -1,10 +1,9 @@
 /*
- * << Ver29よりSDカード対応 >>
  * Givetake BASIC / Pico 2：SDカード拡張（SPI1、FAT32）
- * 接続：GP8=DAT0/MISO、GP9=CS反転用ゲート、GP10=CLK、GP11=CMD/MOSI。
- * AO3416でCSを反転するため、GP9 HIGHでカード選択、LOWで非選択。
+ * 接続：GP8=DAT0/MISO、GP6/IN3=CS直結、GP10=CLK、GP11=CMD/MOSI。
+ * CSはLOWでカード選択、HIGHで非選択。CSと3.3Vの間に10kΩを接続する。
  * カード検出はGP7（IN4）、挿入時LOW。電源は3.3V、GNDは共通。
- * 起動時のOUT端子LOWという既存仕様は変更しない。SDOFFもLOWへ戻す。
+ * 起動時のOUT端子LOWという既存仕様は変更しない。SDOFFでIN3はプルアップ入力へ戻す。
  * 実機では400kHzで初期化、1MHzで読み取りが失敗したため、全転送を100kHzに固定。
  * ポーリング方式。DMAは使用せず、SD処理全体で割り込みを禁止しない。
  * 対応：512バイト/セクター、FAT32のMBR基本パーティションまたは直接配置。
@@ -24,11 +23,15 @@
 #include "hardware/gpio.h"
 
 #define SD_MISO_PIN 8
-#define SD_SELECT_PIN 9
+#define SD_SELECT_PIN 6
 #define SD_CLK_PIN 10
 #define SD_MOSI_PIN 11
 #define SD_DETECT_PIN 7
 static bool sd_pins_reserved = false;
+// SDON中に他の命令から再設定してはいけない端子。OUT2/GP9は使用しない。
+static inline bool sd_pin_reserved(unsigned pin) {
+ return sd_pins_reserved && (pin==SD_SELECT_PIN || pin==SD_MISO_PIN || pin==SD_CLK_PIN || pin==SD_MOSI_PIN);
+}
 static bool sd_initialized = false;
 static bool sd_fat_ready = false;
 static bool sd_files_index_ready = false;
@@ -60,9 +63,9 @@ static bool sd_debug_last_sent = false;
 static inline uint8_t sd_byte(uint8_t value) {
  uint8_t result; spi_write_read_blocking(spi1, &value, &result, 1); return result;
 }
-// カード選択。MOSFET反転回路に合わせ、選択時にGP9をHIGHにする。
+// IN3/GP6をCSへ直結する。選択LOW、非選択HIGH（反転回路なし）。
 static void sd_select(bool selected) {
- gpio_put(SD_SELECT_PIN, selected); sleep_us(10);
+ gpio_put(SD_SELECT_PIN, !selected); sleep_us(10);
 }
 // CSを非選択にし、追加の8クロックでカード側の出力を解放する。
 static void sd_release(void) { sd_select(false); sd_byte(0xff); }
@@ -90,10 +93,14 @@ static bool sd_card_present(void) {
  gpio_pull_up(SD_DETECT_PIN); sleep_us(50);
  return !gpio_get(SD_DETECT_PIN);
 }
-// SDを解放し、GP8～GP11を通常のOUT出力LOWへ戻す。診断値は保持する。
+// SDを解放。先にCSをHIGHにし、IN3をプルアップ入力へ戻す。診断値は保持する。
 static void sd_card_off(void) {
  if(sd_pins_reserved) { sd_release(); spi_deinit(spi1); }
 
+ // 出力中なら先に非選択へ。gpio_initによる入力化後は10kΩでもHIGHを維持する。
+ gpio_put(SD_SELECT_PIN,1);
+ gpio_init(SD_SELECT_PIN); gpio_pull_up(SD_SELECT_PIN);
+ gpio_put(SD_SELECT_PIN,1); gpio_set_dir(SD_SELECT_PIN,GPIO_IN);
  const uint pins[]={8,9,10,11};
  for(unsigned i=0;i<4;i++) { gpio_init(pins[i]); gpio_put(pins[i],0); gpio_set_dir(pins[i],GPIO_OUT); }
  sd_initialized=false; sd_fat_ready=false; sd_files_index_ready=false; sd_pins_reserved=false; sd_block_addressed=false;
@@ -108,7 +115,9 @@ static int sd_card_on(void) {
  spi_set_format(spi1,8,SPI_CPOL_0,SPI_CPHA_0,SPI_MSB_FIRST);
  gpio_set_function(8,GPIO_FUNC_SPI); gpio_set_function(10,GPIO_FUNC_SPI);
  gpio_set_function(11,GPIO_FUNC_SPI); gpio_pull_up(8);
- gpio_put(9,0); gpio_set_dir(9,GPIO_OUT);
+ // 出力ラッチをHIGHにしてから出力化し、切り替え時のLOWパルスを防ぐ。
+ gpio_init(SD_SELECT_PIN); gpio_pull_up(SD_SELECT_PIN);
+ gpio_put(SD_SELECT_PIN,1); gpio_set_dir(SD_SELECT_PIN,GPIO_OUT);
  sleep_ms(10); for(unsigned i=0;i<10;i++) sd_byte(0xff);
  uint8_t r=0xff;
  for(unsigned i=0;i<10;i++) {

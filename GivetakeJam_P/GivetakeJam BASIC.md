@@ -3,8 +3,8 @@
 
 ![Platform](https://img.shields.io/badge/platform-Raspberry%20Pi%20Pico-blue)
 ![Language](https://img.shields.io/badge/language-BASIC-orange)
-![Version](https://img.shields.io/badge/VER()-16129-brightgreen)
-![Status](https://img.shields.io/badge/status-stable-success)
+![Version](https://img.shields.io/badge/VER()-16130-brightgreen)
+![Status](https://img.shields.io/badge/status-RP2350%20hardware%20tested-success)
 
 ## Overview / 概要
 
@@ -17,7 +17,7 @@ This firmware enhances program capacity, expands array variables, improves exter
 
 ## Version / バージョン
 
-The original IchigoJam BASIC version remains **1.6.1**. The current extension identifiers are `16116` for RP2040 and `16129` for RP2350.
+The original IchigoJam BASIC version remains **1.6.1**. The current extension identifiers are `16116` for RP2040 and `16130` for RP2350.
 
 - `16100` : original base version
 - `16112` : infrared receiver build
@@ -34,6 +34,8 @@ The original IchigoJam BASIC version remains **1.6.1**. The current extension id
 - `16116` : RP2040 build fixed `STOP` command to report `Break in line` instead of `Syntax error in line`.
 - `16128` : RP2350 build fixed `STOP` command to report `Break in line` instead of `Syntax error in line`.
 - `16129` : Added `SDON` and `SDOFF` for program storage on SD cards (Pico 2 / RP2350 hardware tested; RP2040 SD support unverified).
+
+- `16130` : Changed CS to IN3 / GPIO6 with direct active-LOW control and a 10kΩ pull-up.
 
 ## Highlights / 主な特徴
 
@@ -77,7 +79,7 @@ The original IchigoJam BASIC version remains **1.6.1**. The current extension id
 ![BASIC Game](./docs/IMG_4690up.png)
 
 ### SD Card Expansion Board Circuit
-![SD Card Expansion Board Circuit](./docs/MSD_MemCard.png)
+![SD Card Expansion Board Circuit](./docs/MSD_MemCard101.png)
 
 ## Main Documents
 

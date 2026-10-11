@@ -1702,7 +1702,7 @@ static int16 token_expression5()
 		int n = token_opt1();
 		if (n == 0)
 #ifdef PICO_RP2350
-			return IJB_VER * 100 + IJB_BUILD + 29; // Pico 2 / RP2350版識別用: VER() = 16129 <<Ver29より SDカード対応となる。>>
+			return IJB_VER * 100 + IJB_BUILD + 30; // RP2350: VER()=16130、IN3直結CS方式
 #else
 			return IJB_VER * 100 + IJB_BUILD + 16; // Pico / RP2040版識別用: VER() = 16116
 #endif
@@ -5538,6 +5538,12 @@ S_INLINE void command_ir_in()
 		*basic_getArrayPtr(base + 4) = 0;
 		*basic_getArrayPtr(base + 5) = 1; // 不正なポート
 		*basic_getArrayPtr(base + 6) = 0;
+		return;
+	}
+
+	// SDON中のCS/IN3とSPI端子を赤外線入力へ切り替えない。
+	if (sd_pin_reserved((unsigned)gpio)) {
+		command_error(ERR_FILE_ERROR);
 		return;
 	}
 

@@ -2,11 +2,11 @@
 ![Platform](https://img.shields.io/badge/platform-Raspberry%20Pi%20Pico-blue)
 ![Language](https://img.shields.io/badge/language-BASIC-orange)
 ![License](https://img.shields.io/badge/license-IchigoJam-green)
-![Version](https://img.shields.io/badge/version-16129-brightgreen)
-![Status](https://img.shields.io/badge/status-stable-success)
+![Version](https://img.shields.io/badge/version-16130-brightgreen)
+![Status](https://img.shields.io/badge/status-RP2350%20hardware%20tested-success)
 Extended IchigoJam BASIC for Raspberry Pi Pico with a 4096-byte program area, expanded arrays, improved external EEPROM support, NEC infrared reception, environmental sensing, color display / palette / attribute commands, and program storage on SD cards.
 ## Highlights
-- Full compatibility with IchigoJam BASIC 1.6.1 commands
+- Extends IchigoJam BASIC 1.6.1 while retaining compatibility with its original BASIC design
 - Program size expanded from 1024 bytes to 4096 bytes
 - Internal flash storage slots
   - Raspberry Pi Pico / RP2040: 25 slots
@@ -18,11 +18,10 @@ Extended IchigoJam BASIC for Raspberry Pi Pico with a 4096-byte program area, ex
 - Added `IR.IN` command for NEC infrared reception
 - Added `ENV.IN` command for AHT20 + BMP280 environment sensing
 - Fixed `WS.LED` array access for extended arrays and added bounds checking
-- `VER()` returns `16129` on Raspberry Pi Pico 2 / RP2350
+- `VER()` returns `16130` on Raspberry Pi Pico 2 / RP2350
 - Added `COLOR f[,b[,c]]` command for HSTX DVI text colors
 - Added `PAL n,v`, `PAL RESET`, and `PAL(n)` for RGB332 palette control
 - Added `ATTR x,y,a` and `ATTR(x,y)` for text color attribute control
-- Added MSX-style `COLOR f[,b[,c]]` command for RP2350 HSTX DVI text output
 ## Memory Map
 ```text
 #000 CHAR
@@ -63,7 +62,7 @@ Extended IchigoJam BASIC for Raspberry Pi Pico with a 4096-byte program area, ex
 - Added `ENV.IN` command for AHT20 + BMP280 environment sensing
 - Built-in `HELP` memory map updated
 - `VER()` returns `16116` on Raspberry Pi Pico / RP2040
-- `VER()` returns `16129` on Raspberry Pi Pico 2 / RP2350
+- `VER()` returns `16130` on Raspberry Pi Pico 2 / RP2350
 - Platform identification by `VER(1)`
   - Raspberry Pi Pico / RP2040: `8`
   - Raspberry Pi Pico 2 / RP2350: `9`
@@ -257,13 +256,7 @@ ENV.IN [n]
 ## SD Card Program Storage
 
 `SDON` initializes the card and checks FAT32. On success, it displays `SD ready (FAT32, 100kHz)`.
-`SDOFF` releases the SD pins and restores OUT1–OUT4 to output LOW. It does not switch off card power. Both commands are available in the same firmware; switching modes does not require reflashing.
-
-SD features have been tested on Pico 2 / RP2350 with HSTX DVI. **RP2040 SD support remains unverified.** The SD code is currently shared and has not been fully separated by processor.
-
-Programs are stored at the top level of the card as `P200.IJB` through `P299.IJB`. Each file contains a **4096-byte binary BASIC program image**, rather than a text `.BAS` file. `Saved` and `Loaded` show the program's used bytes. If an SD load fails, the current program is preserved.
-
-After `SDON`, `FILES` and `FILES0` list existing SD programs. After `SDOFF`, they return to their original Flash / EEPROM behavior. Explicit numbers retain their meaning: `FILES20` lists internal Flash slots 0–20, and `FILES90,220` lists Flash, EEPROM, and SD slots while SD is enabled. Requesting an SD range while SD is disabled returns `File error`. Missing SD files and unassigned slot numbers are omitted.
+`SDOFF` sets CS HIGH, restores IN3 to input with pull-up, and restores OUT1–OUT4 to output LOW. It does not switch off card power.
 
 | Command | Behavior |
 | --- | --- |
@@ -289,6 +282,11 @@ LOAD202
 LIST
 RUN
 ```
+SD features have been tested on Pico 2 / RP2350 with HSTX DVI. **RP2040 SD support remains unverified.** The SD code is currently shared and has not been fully separated by processor.
+
+Programs are stored at the top level of the card as `P200.IJB` through `P299.IJB`. Each file contains a **4096-byte binary BASIC program image**, rather than a text `.BAS` file. `Saved` and `Loaded` show the program's used bytes. If an SD load fails, the current program is preserved.
+
+After `SDON`, `FILES` and `FILES0` list existing SD programs. After `SDOFF`, they return to their original Flash / EEPROM behavior. Explicit numbers retain their meaning: `FILES20` lists internal Flash slots 0–20, and `FILES90,220` lists Flash, EEPROM, and SD slots while SD is enabled. Requesting an SD range while SD is disabled returns `File error`. Missing SD files and unassigned slot numbers are omitted.
 
 ## Version Identification
 
@@ -297,7 +295,7 @@ The original IchigoJam BASIC version remains **1.6.1**. The final two digits of 
 | Platform | `VER()` | `VER(1)` |
 | --- | --- | --- |
 | Raspberry Pi Pico / RP2040 | `16116` | `8` |
-| Raspberry Pi Pico 2 / RP2350 | `16129` | `9` |
+| Raspberry Pi Pico 2 / RP2350 | `16130` | `9` |
 
 Example for Pico 2:
 
@@ -307,11 +305,14 @@ CLS
 ? VER(1)
 ```
 
-Expected output: `16129`, then `9`.
+Expected output: `16130`, then `9`.
 
 ---
 
-## Build Environment
+## RP2040 Build Environment (Raspberry Pi Pico)
+
+The library versions and PicoDVI setup in this section apply to the RP2040 build. For Pico 2 / RP2350, use the separate instructions below.
+
 Create the build environment inside the `IchigoJam_P` directory.
 ### Required tools
 - CMake
@@ -339,7 +340,10 @@ PICO_SDK_PATH=foo/IchigoJam_P/pico-sdk
 PICO_EXTRAS_PATH=foo/IchigoJam_P/pico-extras
 ```
 See the Raspberry Pi documentation for details.
-## Build
+### Build for RP2040
+
+Run the following commands from the repository root.
+
 ```sh
 cd IchigoJam_P
 mkdir build
@@ -367,6 +371,22 @@ Copy the following files from the `GivetakeJam_P` directory into the correspondi
 - Root `CMakeLists.txt`: link `hardware_spi` for SD support
 
 Then build as usual. When `IchigoJam_P.uf2` is generated, write it to the Pico.
+## RP2350 Build (Raspberry Pi Pico 2 / macOS)
+
+The RP2350 build uses HSTX DVI and does not use the PicoDVI library.
+Prepare `pico-sdk-rp2350`, `pico-extras-rp2350`, and the Arm GNU Toolchain separately from the RP2040 library setup described above.
+
+Run the following commands from the repository root:
+
+```sh
+cd IchigoJam_P
+./build_pico2_mac.sh
+```
+
+After a successful build, `IchigoJam_P/build-pico2/IchigoJam_P.uf2` is generated (path relative to the repository root). Write this file to Pico 2.
+
+For distribution, the same UF2 is saved under the name `GivetakeJam_P.uf2`.
+
 ## Raspberry Pi Pico / RP2040 Firmware / Checksum
 ### Write this firmware to Raspberry Pi Pico / RP2040.
 - `IchigoJam_P.uf2`
@@ -376,9 +396,10 @@ Then build as usual. When `IchigoJam_P.uf2` is generated, write it to the Pico.
 ## Raspberry Pi Pico 2 / RP2350 Firmware / Checksum
 ### Write this firmware to Raspberry Pi Pico 2 / RP2350.
 - `GivetakeJam_P.uf2`
-  - `SHA-256`: `BD0EF15406638837090A0601BEACAA81EB844351032D8C63F642C9280D58FF07`
-  - `MD5`: `67FC2EAE67F16C0A360042C6921FC585`
-  - `SHA-1`: `A4B501EA4F84E54EEDCD5D306F7EC4E4AC5AE980`
+  - `SHA-256`: `F64CEEB28BCBE274E6EA3DA329590D4A67A3FF924AABC2E8CBCAFD36B56E51E2`
+  - `MD5`: `C890CF1365426FBE0A5D994A445ED5A6`
+  - `SHA-1`: `D917DE20A65255F7B7851C86528B24B83C94E942`
+
 ## Test Programs
 - `ARRAY_VAR_TOTAL_TEST.BAS`
   - Comprehensive array-variable test
@@ -414,7 +435,7 @@ Use the cursor keys to select a color number and change the palette value.
 Press `R` to restore the default firmware palette with `PAL RESET`.
 
 ### SD Card Expansion Board Circuit
-![SD card expander PCB](./docs/MSD_MemCard.png)
+![SD card expander PCB](./docs/MSD_MemCard101.png)
 
 ## Known Limitations / Notes
 - Program size is limited to 4096 bytes
@@ -432,9 +453,8 @@ Press `R` to restore the default firmware palette with `PAL RESET`.
 - For stable IR reception, repeat filtering is recommended in BASIC
 - SD card access
   - SD program slots are limited to 200–299 (100 programs). This range is defined by the firmware, rather than by SD card capacity or RAM size. Supporting more slots requires firmware changes.
-
-  - Initialization and transfers are fixed at **100kHz** based on prototype results. SD uses polling rather than DMA and does not disable interrupts across initialization/transfers. SDON reserves GP8–GP11; conflicting OUT/PWM/CLO operations return File error. Normal boot OUT=LOW behavior is retained. UART uses GP0/GP1. The inverted-CS board is not interchangeable with a generic direct-CS module.
-
+  - Initialization and transfers are fixed at **100kHz** based on prototype results. SD uses polling rather than DMA and does not disable interrupts across initialization/transfers.
+  SDON reserves CS on IN3 / GP6 and SPI on GP8, GP10, and GP11; conflicting OUT/PWM/IR.IN/CLO operations return File error. While SD is enabled, IN3 is configured as an output to control CS. IN(3) reads the CS level, so IN3 cannot be used for external input.
   - Supported cards use FAT32 with 512-byte sectors. The FAT32 volume may be inside an MBR primary partition or occupy the whole card without a partition table. Programs are saved at the top level of the card, outside folders, using names with up to eight characters and extensions with up to three characters: `P200.IJB` through `P299.IJB`. FAT12/FAT16, exFAT, GPT, extended partitions, subfolders and root-directory growth are not implemented. Root scans stop at 256 sectors / 32 clusters. Overwritten existing files are limited to 4096 bytes / 8 clusters.
 
   - Sector reads verify CRC16. SAVE writes new clusters, reads back and compares every sector, changes the directory, then frees the old chain. If power is lost or the card is removed during SAVE, the program file or the card's file-management information may be damaged. Do not switch off power or remove the card until saving is complete, and back up important data. Without an RTC, file dates use 1980-01-01.
@@ -465,3 +485,4 @@ Givetakewinwin
 - Updated on 2026-08-24 for Raspberry Pi Pico 2 / Refreshes all wrapped display rows when editing long listed lines.
 - Updated on 2026-08-28 for Raspberry Pi Pico / RP2040 and Raspberry Pi Pico 2 / RP2350 / Fixed `STOP` command to report `Break in line` instead of `Syntax error in line`.
 - Updated on 2026-10-11: Added `SDON` and `SDOFF` for program storage on SD cards.
+- Updated on 2026-10-11, revision 16130: Changed CS to IN3 / GP6 with direct active-LOW control and a 10kΩ pull-up.
