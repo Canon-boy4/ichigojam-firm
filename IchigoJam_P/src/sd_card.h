@@ -7,8 +7,9 @@
  * 実機では400kHzで初期化、1MHzで読み取りが失敗したため、全転送を100kHzに固定。
  * ポーリング方式。DMAは使用せず、SD処理全体で割り込みを禁止しない。
  * 対応：512バイト/セクター、FAT32のMBR基本パーティションまたは直接配置。
- * 保存番号200～299はルートのP200.IJB～P299.IJB。1ファイル4096バイト。
- * データ形式はBASIC内部形式。テキストの.BASをそのままLOADする機能はない。
+ * 保存番号200～299：SAVE nはPnnn.IJB（4096バイト）、SAVE n,1はPnnn.BAS（LIST形式）。
+ * 1番号1ファイル。形式切り替えは保存成功後に旧形式を削除。空保存は両形式を削除。
+ * BASは最大8192バイト、行番号付き・昇順。内部プログラム上限4096バイトは共通。
  * 読み取りCRC検査、書き込み後のCRC検査と全バイト照合を行う。
  * SAVEは新規クラスタへ書き、照合後にディレクトリを変更し、旧クラスタを解放する。
  * 電源断に対する完全な原子性はない。途中失敗で孤立クラスタ/FAT不一致が残り得る。
@@ -418,17 +419,109 @@ static int sd_validate_program(const uint8_t *data, uint32_t size) {
   previous=line; pos+=len+4;
  }
 }
-// LOAD/LRUN用。ファイル全体を読んで検査し、成功後にBASIC側がRAMへ反映する。
-// エラー36はSDON/FAT32確認が必要、37は内部プログラム形式の不正。
+// LISTと同じ「行番号 空白 本文」をCRLF区切りで保存する。
+// ASCIIはPCと共通。128以上の文字はIchigoJamの文字コードをそのまま保持する。
+#define SD_TEXT_MAX 8192u
+static uint8_t sd_text_data[SD_TEXT_MAX];
+static unsigned sd_saved_bytes;
+static bool sd_last_deleted;
+static bool sd_slot_name_format(int n, bool text, char name[12]) {
+ if(!sd_slot_name(n,name))return false;
+ if(text){name[8]='B';name[9]='A';name[10]='S';}return true;
+}
+// プログラム使用量だけでなく、終端とレコード境界も先に検査する。
+static bool sd_check_source(const uint8_t *program,unsigned size) {
+ if(size>4096){sd_file_error=37;return false;}
+ for(unsigned i=0;i<4096;i++)sd_file_data[i]=i<size?program[i]:0;
+ if(sd_validate_program(sd_file_data,4096)!=(int)size){sd_file_error=37;return false;}
+ return true;
+}
+static bool sd_encode_bas(unsigned size,unsigned *bytes) {
+ unsigned pos=0,out=0;
+ while(pos<size){
+  unsigned line=sd_le16(sd_file_data+pos);char digits[5];unsigned count=0;
+  do{digits[count++]=(char)('0'+line%10);line/=10;}while(line);
+  if(out+count+3>SD_TEXT_MAX){sd_file_error=55;return false;}
+  while(count)sd_text_data[out++]=(uint8_t)digits[--count];
+  sd_text_data[out++]=' ';
+  for(unsigned i=pos+3;sd_file_data[i];i++){
+   if(out+2>=SD_TEXT_MAX){sd_file_error=55;return false;}
+   sd_text_data[out++]=sd_file_data[i];
+  }
+  sd_text_data[out++]='\r';sd_text_data[out++]='\n';pos+=sd_file_data[pos+2]+4;
+ }
+ *bytes=out;return true;
+}
+// PCで編集したBASを一時領域で内部形式へ変換する。RAMの現行プログラムは変更しない。
+// CRLF/LF/CR、末尾改行なし、先頭UTF-8 BOM（ASCII本文）を受け入れる。
+// 行番号は1～32767の昇順。重複・逆順・空本文・長すぎる行はエラー55。
+static int sd_decode_bas(unsigned size) {
+ if(size>SD_TEXT_MAX){sd_file_error=33;return -1;}
+ unsigned at=0,out=0,previous=0;
+ for(unsigned i=0;i<4096;i++)sd_file_data[i]=0;
+ if(size>=3 && sd_text_data[0]==0xef && sd_text_data[1]==0xbb && sd_text_data[2]==0xbf)at=3;
+ while(at<size){
+  unsigned end=at;while(end<size && sd_text_data[end]!='\r' && sd_text_data[end]!='\n')end++;
+  unsigned next=end;if(next<size && sd_text_data[next++]=='\r' && next<size && sd_text_data[next]=='\n')next++;
+  unsigned p=at;while(p<end && (sd_text_data[p]==' ' || sd_text_data[p]=='\t'))p++;
+  if(p==end){at=next;continue;}
+  unsigned line=0,start=p;
+  while(p<end && sd_text_data[p]>='0' && sd_text_data[p]<='9'){
+   line=line*10u+(unsigned)(sd_text_data[p++]-'0');if(line>32767)goto invalid;
+  }
+  if(p==start || line==0 || line<=previous || p==end || (sd_text_data[p]!=' ' && sd_text_data[p]!='\t'))goto invalid;
+  p++; // LISTが行番号の後に付ける区切り1文字だけを除去。本文の字下げは保持。
+  unsigned body=end-p;if(!body || body>254)goto invalid;
+  unsigned len=(body+1u)&~1u;
+  if(out+len+4>4096){sd_file_error=56;return -1;}
+  sd_file_data[out]=(uint8_t)line;sd_file_data[out+1]=(uint8_t)(line>>8);sd_file_data[out+2]=(uint8_t)len;
+  for(unsigned i=0;i<body;i++){
+   uint8_t ch=sd_text_data[p+i];if(ch==0)goto invalid;
+   sd_file_data[out+3+i]=ch;
+  }
+  out+=len+4;previous=line;at=next;
+ }
+ if(sd_validate_program(sd_file_data,4096)!=(int)out)goto invalid;
+ return (int)out;
+invalid:sd_file_error=55;return -1;
+}
+// 最大16クラスタまで循環を検査しつつテキストを読み取る。
+static bool sd_read_bas(const SdFileInfo *file) {
+ if(file->size>SD_TEXT_MAX){sd_file_error=33;return false;}
+ uint32_t c=file->cluster,seen[16];unsigned count=0,done=0;
+ while(done<file->size){
+  if(!sd_valid_cluster(c)){sd_file_error=31;return false;}
+  for(unsigned i=0;i<count;i++)if(seen[i]==c){sd_file_error=34;return false;}
+  if(count==16){sd_file_error=34;return false;}seen[count++]=c;
+  uint32_t first=sd_fat.data_lba+(c-2u)*sd_fat.sectors_per_cluster;
+  for(unsigned j=0;j<sd_fat.sectors_per_cluster && done<file->size;j++){
+   if(!sd_read_checked(first+j)){sd_file_error=35;return false;}
+   unsigned amount=file->size-done;if(amount>512)amount=512;
+   for(unsigned i=0;i<amount;i++)sd_text_data[done+i]=sd_sector[i];
+   done+=amount;
+  }
+  if(done<file->size){uint32_t next;if(!sd_next_cluster(c,&next))return false;if(next>=0x0ffffff8u){sd_file_error=34;return false;}c=next;}
+ }
+ return true;
+}
+
+// LOAD/LRUNはIJBを優先する。PC等で両形式が存在しても読み取り時は削除しない。
 static int sd_prepare_program(int n) {
- sd_file_error=0; sd_read_error=0;
- if(!sd_initialized || !sd_fat_ready) { sd_file_error=36; return -1; }
- char name[12]; if(!sd_slot_name(n,name)) { sd_file_error=37; return -1; }
+ sd_file_error=0;sd_read_error=0;
+ if(!sd_initialized || !sd_fat_ready){sd_file_error=36;return -1;}
+ char name[12];if(!sd_slot_name(n,name)){sd_file_error=37;return -1;}
  SdFileInfo file;
- if(!sd_find_root(name,&file) || !sd_read_small_file(&file)) return -1;
- int length=sd_validate_program(sd_file_data,file.size);
- if(length<0) { sd_file_error=37; return -1; }
- sd_program_file_size=file.size; return length;
+ if(sd_find_root(name,&file)){
+  if(!sd_read_small_file(&file))return -1;
+  int length=sd_validate_program(sd_file_data,file.size);
+  if(length<0){sd_file_error=37;return -1;}
+  sd_program_file_size=file.size;return length;
+ }
+ // IJBがない場合だけBASを探す。IJBの破損・読み取り失敗時には切り替えない。
+ if(sd_file_error!=30)return -1;
+ sd_slot_name_format(n,true,name);
+ if(!sd_find_root(name,&file) || !sd_read_bas(&file))return -1;
+ int length=sd_decode_bas(file.size);if(length>=0)sd_program_file_size=file.size;return length;
 }
 
 
@@ -547,25 +640,25 @@ static bool sd_find_save_slot(const char *name,SdDirSlot *slot) {
   if(next>=0x0ffffff8u){if(have_free)return true;sd_file_error=51;return false;}c=next;
  }
 }
-// 上書き前に旧クラスタ列を調べる。最大8クラスタ、循環/サイズ異常は拒否する。
-static bool sd_collect_old_chain(const SdDirSlot *slot,uint32_t old[8],unsigned *count) {
+// 上書き前に旧クラスタ列を調べる。最大16クラスタ、循環/サイズ異常は拒否する。
+static bool sd_collect_old_chain(const SdDirSlot *slot,uint32_t old[16],unsigned *count) {
  *count=0;
  if(!slot->exists || !slot->cluster){
   if(slot->exists && slot->size){sd_file_error=31;return false;}return true;
  }
- if(slot->size>4096){sd_file_error=53;return false;}
+ if(slot->size>SD_TEXT_MAX){sd_file_error=53;return false;}
  uint32_t c=slot->cluster;
  while(c<0x0ffffff8u){
   if(!sd_valid_cluster(c)){sd_file_error=31;return false;}
   for(unsigned i=0;i<*count;i++)if(old[i]==c){sd_file_error=34;return false;}
-  if(*count==8){sd_file_error=53;return false;}old[(*count)++]=c;
+  if(*count==16){sd_file_error=53;return false;}old[(*count)++]=c;
   if(!sd_next_cluster(c,&c))return false;
  }
  if((uint64_t)*count*sd_fat.sectors_per_cluster*512u<slot->size){sd_file_error=34;return false;}
  return true;
 }
 // 空きクラスタを先に必要数探索し、その後FATへ新しい列を登録する。
-static bool sd_allocate_chain(unsigned needed,uint32_t chain[8]) {
+static bool sd_allocate_chain(unsigned needed,uint32_t chain[16]) {
  unsigned count=0;uint32_t c=sd_valid_cluster(sd_alloc_hint)?sd_alloc_hint:2,scanned=0,last_sector=0xffffffffu;
 
  while(scanned<sd_fat.clusters && count<needed){
@@ -579,68 +672,105 @@ static bool sd_allocate_chain(unsigned needed,uint32_t chain[8]) {
  for(unsigned i=0;i<needed;i++)if(!sd_set_fat(chain[i],i+1<needed?chain[i+1]:0x0fffffffu))return false;
  return true;
 }
-// SAVE用。新規データの書き込みと照合→ディレクトリ切り替え→旧列解放の順に行う。
-// 途中失敗したら再度SDONが必要。確保済み領域やディレクトリ更新が残る場合がある。
-// ファイルエラー50保護/名前衝突、51ルート満杯、52空き不足、53旧ファイル/列の上限、54 FAT不一致。
-static bool sd_save_program(int n,const uint8_t *program,unsigned size) {
- sd_file_error=0;sd_read_error=0;sd_write_error=0;sd_save_commit_started=false;sd_save_committed=false;
- if(!sd_initialized || !sd_fat_ready){sd_file_error=36;return false;}
- char name[12];if(size>4096 || !sd_slot_name(n,name)){sd_file_error=37;return false;}
- for(unsigned i=0;i<4096;i++)sd_file_data[i]=i<size?program[i]:0;
- if(sd_validate_program(sd_file_data,4096)!=(int)size){sd_file_error=37;return false;}
- SdDirSlot slot;if(!sd_find_save_slot(name,&slot))return false;
- uint32_t old[8],fresh[8];unsigned old_count;
+// 保存/削除で対象拡張子だけを更新する。存在しないファイルの削除も正常終了する。
+static bool sd_save_payload(int n,bool text,const uint8_t *data,unsigned bytes,bool remove) {
+ char name[12];if(!sd_slot_name_format(n,text,name)){sd_file_error=37;return false;}
+ SdDirSlot slot;
+ if(!sd_find_save_slot(name,&slot)){
+  if(remove && sd_file_error==51){sd_file_error=0;return true;}return false;
+ }
+ if(remove && !slot.exists)return true;
+ // IJBに対する旧来のサイズ保護は維持。BASは最大8KiBまで。
+ if(!text && slot.size>4096){sd_file_error=53;return false;}
+ uint32_t old[16],fresh[16];unsigned old_count;
  if(!sd_collect_old_chain(&slot,old,&old_count))return false;
+ if(!text && old_count>8){sd_file_error=53;return false;}
  if(!sd_read_checked(sd_fat.fat_lba)){sd_file_error=35;return false;}
  uint32_t flags=sd_le32(sd_sector+4)&0x0fffffffu;bool was_clean=(flags&0x08000000u)!=0;
-
- // 変更前にクリーンビットを落とす。成功時のみ、もともとクリーンなら復元する。
+ sd_files_index_ready=false;
  if(!sd_set_fat(1,flags&~0x08000000u))goto failure;
  if(!sd_invalidate_fsinfo(sd_fat.fsinfo_lba) || !sd_invalidate_fsinfo(sd_fat.fsinfo_backup_lba))goto failure;
- unsigned needed=(8u+sd_fat.sectors_per_cluster-1u)/sd_fat.sectors_per_cluster;
- if(!sd_allocate_chain(needed,fresh))goto failure;
- for(unsigned sector=0;sector<8;sector++){
-  unsigned ci=sector/sd_fat.sectors_per_cluster,j=sector%sd_fat.sectors_per_cluster;
-  uint32_t lba=sd_fat.data_lba+(fresh[ci]-2u)*sd_fat.sectors_per_cluster+j;
-  if(!sd_write_verified(lba,sd_file_data+sector*512u))goto failure;
- }
-
- if(slot.ended && slot.next_lba){
-  if(!sd_read_checked(slot.next_lba)){sd_file_error=35;goto failure;}
-  sd_sector[0]=0;if(!sd_write_verified(slot.next_lba,sd_sector))goto failure;
+ if(!remove){
+  unsigned sectors=(bytes+511u)/512u;
+  unsigned needed=(sectors+sd_fat.sectors_per_cluster-1u)/sd_fat.sectors_per_cluster;
+  if(!needed || needed>16){sd_file_error=55;goto failure;}
+  if(!sd_allocate_chain(needed,fresh))goto failure;
+  for(unsigned sector=0;sector<sectors;sector++){
+   unsigned ci=sector/sd_fat.sectors_per_cluster,j=sector%sd_fat.sectors_per_cluster;
+   uint32_t lba=sd_fat.data_lba+(fresh[ci]-2u)*sd_fat.sectors_per_cluster+j;
+   unsigned offset=sector*512u,amount=bytes-offset;if(amount>512)amount=512;
+   // 最終セクターの余りはゼロで埋める。ファイル長には含めない。
+   uint8_t padded[512];
+   for(unsigned i=0;i<512;i++)padded[i]=i<amount?data[offset+i]:0;
+   if(!sd_write_verified(lba,padded))goto failure;
+  }
+  if(slot.ended && slot.next_lba){
+   if(!sd_read_checked(slot.next_lba)){sd_file_error=35;goto failure;}
+   sd_sector[0]=0;if(!sd_write_verified(slot.next_lba,sd_sector))goto failure;
+  }
  }
  if(!sd_read_checked(slot.lba)){sd_file_error=35;goto failure;}
  uint8_t *entry=sd_sector+slot.offset;
- if(!slot.exists){
-  for(unsigned i=0;i<32;i++)entry[i]=0;
-  for(unsigned i=0;i<11;i++)entry[i]=(uint8_t)name[i];
-  sd_put_le16(entry+16,0x21);sd_put_le16(entry+18,0x21);
+ if(remove){
+  // 先にディレクトリを削除済みにし、その後クラスタを解放する。
+  entry[0]=0xe5;
+ }else{
+  if(!slot.exists){
+   for(unsigned i=0;i<32;i++)entry[i]=0;
+   for(unsigned i=0;i<11;i++)entry[i]=(uint8_t)name[i];
+   sd_put_le16(entry+16,0x21);sd_put_le16(entry+18,0x21);
+  }
+  entry[11]=(uint8_t)(slot.attr|0x20);entry[12]=0;
+  sd_put_le16(entry+20,(uint16_t)(fresh[0]>>16));sd_put_le16(entry+26,(uint16_t)fresh[0]);
+  sd_put_le16(entry+22,0);sd_put_le16(entry+24,0x21);sd_put_le32(entry+28,bytes);
+  if(slot.ended && slot.offset<480)sd_sector[slot.offset+32]=0;
  }
- entry[11]=(uint8_t)(slot.attr|0x20);entry[12]=0;
- sd_put_le16(entry+20,(uint16_t)(fresh[0]>>16));sd_put_le16(entry+26,(uint16_t)fresh[0]);
- sd_put_le16(entry+22,0);sd_put_le16(entry+24,0x21);sd_put_le32(entry+28,4096);
- if(slot.ended && slot.offset<480)sd_sector[slot.offset+32]=0;
- // 新規データの照合が済んでから、ファイルが参照するクラスタ番号を切り替える。
  sd_save_commit_started=true;
  if(!sd_write_verified(slot.lba,sd_sector))goto failure;
  sd_save_committed=true;
  for(unsigned i=0;i<old_count;i++)if(!sd_set_fat(old[i],0))goto failure;
  if(was_clean && !sd_set_fat(1,flags))goto failure;
  return true;
-failure:
- sd_fat_ready=false;return false;
+failure:sd_fat_ready=false;return false;
+}
+// 形式切り替え前に両方の旧ファイルを調べる。保護/異常があれば書き始めない。
+static bool sd_preflight_format(int n,bool text) {
+ char name[12];if(!sd_slot_name_format(n,text,name)){sd_file_error=37;return false;}
+ SdDirSlot slot;
+ if(!sd_find_save_slot(name,&slot)){
+  if(sd_file_error==51){sd_file_error=0;return true;}return false;
+ }
+ if(!slot.exists)return true;
+ uint32_t old[16];unsigned count;
+ if(!sd_collect_old_chain(&slot,old,&count))return false;
+ if(!text && (slot.size>4096 || count>8)){sd_file_error=53;return false;}
+ return true;
+}
+// 1番号1ファイル。新形式の保存・照合後に旧形式を削除。空プログラムは両形式を削除。
+static bool sd_save_program(int n,const uint8_t *program,unsigned size,int mode) {
+ sd_file_error=0;sd_read_error=0;sd_write_error=0;sd_save_commit_started=false;sd_save_committed=false;
+ sd_saved_bytes=0;sd_last_deleted=false;
+ if(!sd_initialized || !sd_fat_ready){sd_file_error=36;return false;}
+ if(mode<0 || mode>1 || !sd_check_source(program,size)){if(!sd_file_error)sd_file_error=37;return false;}
+ unsigned bytes=4096;const uint8_t *data=sd_file_data;
+ if(mode){if(!sd_encode_bas(size,&bytes))return false;data=sd_text_data;}
+ if(!sd_preflight_format(n,false) || !sd_preflight_format(n,true))return false;
+ if(!sd_save_payload(n,mode!=0,data,bytes,size==0))return false;
+ // 新ファイルの確定前には旧形式を消さない。失敗時は二重形式が残る場合がある。
+ if(!sd_save_payload(n,mode==0,data,0,true))return false;
+ sd_last_deleted=size==0;sd_saved_bytes=mode?bytes:size;return true;
 }
 
 
-
 static SdFileInfo sd_files_index[100];
-// 一覧状態：0未保存、1通常、2不正な項目または重複名。
+// 一覧状態：0未保存、1通常、2不正な項目、3重複番号（両形式等）。
 static uint8_t sd_files_status[100];
+static uint8_t sd_files_is_bas[100];
 // P200.IJB～P299.IJBの短縮名から、一覧用添字0～99を得る。
 static int sd_directory_slot_number(const uint8_t *e) {
  if(e[0]!='P' || e[1]!='2' || e[2]<'0' || e[2]>'9' || e[3]<'0' || e[3]>'9')return -1;
  for(unsigned i=4;i<8;i++)if(e[i]!=' ')return -1;
- if(e[8]!='I' || e[9]!='J' || e[10]!='B')return -1;
+ if(!((e[8]=='I' && e[9]=='J' && e[10]=='B') || (e[8]=='B' && e[9]=='A' && e[10]=='S')))return -1;
  return (e[2]-'0')*10+(e[3]-'0');
 }
 // ルートを1回探索して100スロットの一覧を作る。BASICプログラムやFILE()は変更しない。
@@ -662,10 +792,16 @@ static bool sd_files_build_index(void) {
     if(e[0]==0){sd_files_index_ready=true;return true;}
     if(e[0]==0xe5 || e[11]==0x0f || (e[11]&0x18))continue;
     int n=sd_directory_slot_number(e);if(n<0)continue;
-    if(sd_files_status[n]){sd_files_status[n]=2;continue;}
+    unsigned is_bas=e[8]=='B';
+    if(sd_files_status[n]){
+     sd_files_status[n]=3;continue;
+    }
+    sd_files_is_bas[n]=(uint8_t)is_bas;
     SdFileInfo *f=&sd_files_index[n];
     f->size=sd_le32(e+28);f->cluster=(((uint32_t)sd_le16(e+20)<<16)|sd_le16(e+26))&0x0fffffffu;
-    sd_files_status[n]=(f->size<2 || f->size>4096 || !sd_valid_cluster(f->cluster))?2:1;
+    sd_files_status[n]=(sd_files_is_bas[n] ?
+     (f->size>SD_TEXT_MAX || (f->size && !sd_valid_cluster(f->cluster))) :
+     (f->size<2 || f->size>4096 || !sd_valid_cluster(f->cluster)))?2:1;
    }
   }
   uint32_t next;if(!sd_next_cluster(c,&next))return false;
@@ -682,7 +818,19 @@ static int sd_files_preview(int number,char *text,unsigned capacity) {
  text[0]=0;unsigned n=(unsigned)(number-200);
  if(sd_files_status[n]==0)return 0;
  if(sd_files_status[n]==2)return 3;
+ if(sd_files_status[n]==3)return 4;
  const SdFileInfo *f=&sd_files_index[n];
+ if(sd_files_is_bas[n]){
+  if(!sd_read_bas(f))return -1;
+  int length=sd_decode_bas(f->size);
+  if(length<0){sd_file_error=0;return 3;}if(!length)return 2;
+  unsigned written=0;
+  for(unsigned i=3;sd_file_data[i] && written+1<capacity;i++){
+   uint8_t ch=sd_file_data[i];text[written++]=(char)(ch<32?'.':ch);
+  }
+  text[written]=0;return 1;
+ }
+
  uint32_t first=sd_fat.data_lba+(f->cluster-2u)*sd_fat.sectors_per_cluster;
  if(!sd_read_checked(first)){sd_file_error=35;return -1;}
  unsigned line=sd_le16(sd_sector);if(line==0)return 2;

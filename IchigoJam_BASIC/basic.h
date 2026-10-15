@@ -1702,7 +1702,7 @@ static int16 token_expression5()
 		int n = token_opt1();
 		if (n == 0)
 #ifdef PICO_RP2350
-			return IJB_VER * 100 + IJB_BUILD + 30; // RP2350: VER()=16130、IN3直結CS方式
+			return IJB_VER * 100 + IJB_BUILD + 31; // RP2350: VER()=16131、BAS保存・自動LOAD・空保存削除
 #else
 			return IJB_VER * 100 + IJB_BUILD + 16; // Pico / RP2040版識別用: VER() = 16116
 #endif
@@ -3365,14 +3365,18 @@ S_INLINE void command_save()
 		n = token_expression();
 		IJB_ERR_CHK();
 	}
-	token_end();
+	// SAVE n,1はSDへLIST形式で保存。省略または0は従来の内部形式。
+	int format=token_option1(0);
 	IJB_ERR_CHK();
+	if (format<0 || format>1 || (format==1 && (n<200 || n>299))) {
+		command_error(ERR_ILLEGAL_ARGUMENT); return;
+	}
 
 
  // SD保存番号はSD処理へ、それ以外は従来のFlash/EEPROM処理へ渡す。
  int result;
  if(n>=200 && n<=299) {
-  result=sd_save_program(n,(const uint8_t *)list,(unsigned)_g.listsize)?0:1;
+  result=sd_save_program(n,(const uint8_t *)list,(unsigned)_g.listsize,format)?0:1;
   if(!result)_g.lastfile=n;
   else {
    if(sd_write_error) {
@@ -3389,8 +3393,12 @@ S_INLINE void command_save()
 		if (!noresmode)
 		{
 			//		_printf("Saved %dbyte\n", _g.listsize);
-			put_str("Saved ");
-			put_num(_g.listsize);
+			if(n>=200 && n<=299 && sd_last_deleted) {
+                put_str("Deleted\n");
+                return;
+            }
+            put_str("Saved ");
+			put_num(n>=200 && n<=299 ? sd_saved_bytes : (unsigned)_g.listsize);
 			put_str("byte\n");
 		}
 	}
@@ -3431,11 +3439,12 @@ static int sd_files_print_row(int number) {
  int status=sd_files_preview(number,preview,sizeof(preview));
  if(status<0){put_str("SD file error ");put_num(sd_file_error);put_chr('\n');command_error(ERR_FILE_ERROR);return -1;}
  if(!status)return 0;
- int width=put_num(number);put_chr(' ');
+ int width=put_num(number);put_chr(status==4 ? '!' : (sd_files_is_bas[number-200] ? '*' : ' '));put_chr(' ');
  if(status==2)put_str("[empty]");
  else if(status==3)put_str("[invalid]");
+ else if(status==4)put_str("[duplicate]");
  else {
-  int limit=SCREEN_W-3-width;if(limit<0)limit=0;
+  int limit=SCREEN_W-4-width;if(limit<0)limit=0;
   preview[limit]=0;put_str(preview);
  }
  put_chr('\n');return 1;

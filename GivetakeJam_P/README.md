@@ -2,8 +2,9 @@
 ![Platform](https://img.shields.io/badge/platform-Raspberry%20Pi%20Pico-blue)
 ![Language](https://img.shields.io/badge/language-BASIC-orange)
 ![License](https://img.shields.io/badge/license-IchigoJam-green)
-![Version](https://img.shields.io/badge/version-16130-brightgreen)
+![Version](https://img.shields.io/badge/version-16131-brightgreen)
 ![Status](https://img.shields.io/badge/status-RP2350%20hardware%20tested-success)
+
 Extended IchigoJam BASIC for Raspberry Pi Pico with a 4096-byte program area, expanded arrays, improved external EEPROM support, NEC infrared reception, environmental sensing, color display / palette / attribute commands, and program storage on SD cards.
 ## Highlights
 - Extends IchigoJam BASIC 1.6.1 while retaining compatibility with its original BASIC design
@@ -18,7 +19,7 @@ Extended IchigoJam BASIC for Raspberry Pi Pico with a 4096-byte program area, ex
 - Added `IR.IN` command for NEC infrared reception
 - Added `ENV.IN` command for AHT20 + BMP280 environment sensing
 - Fixed `WS.LED` array access for extended arrays and added bounds checking
-- `VER()` returns `16130` on Raspberry Pi Pico 2 / RP2350
+- `VER()` returns `16131` on Raspberry Pi Pico 2 / RP2350
 - Added `COLOR f[,b[,c]]` command for HSTX DVI text colors
 - Added `PAL n,v`, `PAL RESET`, and `PAL(n)` for RGB332 palette control
 - Added `ATTR x,y,a` and `ATTR(x,y)` for text color attribute control
@@ -62,7 +63,7 @@ Extended IchigoJam BASIC for Raspberry Pi Pico with a 4096-byte program area, ex
 - Added `ENV.IN` command for AHT20 + BMP280 environment sensing
 - Built-in `HELP` memory map updated
 - `VER()` returns `16116` on Raspberry Pi Pico / RP2040
-- `VER()` returns `16130` on Raspberry Pi Pico 2 / RP2350
+- `VER()` returns `16131` on Raspberry Pi Pico 2 / RP2350
 - Platform identification by `VER(1)`
   - Raspberry Pi Pico / RP2040: `8`
   - Raspberry Pi Pico 2 / RP2350: `9`
@@ -282,11 +283,55 @@ LOAD202
 LIST
 RUN
 ```
-SD features have been tested on Pico 2 / RP2350 with HSTX DVI. **RP2040 SD support remains unverified.** The SD code is currently shared and has not been fully separated by processor.
+SD features through revision 16131 have been tested on Pico 2 / RP2350 with HSTX DVI.
+**RP2040 SD support remains unverified.** The SD code is currently shared and has not been fully separated by processor.
 
-Programs are stored at the top level of the card as `P200.IJB` through `P299.IJB`. Each file contains a **4096-byte binary BASIC program image**, rather than a text `.BAS` file. `Saved` and `Loaded` show the program's used bytes. If an SD load fails, the current program is preserved.
+Programs are stored at the top level of the card as `P200.IJB` through `P299.IJB` (binary) or `P200.BAS` through `P299.BAS` (text). Each IJB file contains a **4096-byte binary BASIC program image**, rather than a text `.BAS` file. IJB `Saved` and both formats' `Loaded` show internal program bytes; BAS `Saved` shows text file bytes. If an SD load fails, the current program is preserved.
 
 After `SDON`, `FILES` and `FILES0` list existing SD programs. After `SDOFF`, they return to their original Flash / EEPROM behavior. Explicit numbers retain their meaning: `FILES20` lists internal Flash slots 0–20, and `FILES90,220` lists Flash, EEPROM, and SD slots while SD is enabled. Requesting an SD range while SD is disabled returns `File error`. Missing SD files and unassigned slot numbers are omitted.
+
+## Revision 16131: BAS Export, Automatic Import, and Deletion
+
+| Command | SD behavior |
+| --- | --- |
+| `SAVE200` or `SAVE200,0` | Save `P200.IJB` in the existing 4096-byte binary format |
+| `SAVE200,1` | Save `P200.BAS` as line-numbered text matching LIST |
+| `LOAD200` / `LRUN200` | Load IJB when present; otherwise load BAS. If both exist, prefer IJB and retain both files |
+| `FILES` / `FILES200,299` | Mark BAS with `*`, IJB with a space, and duplicate slots with `! [duplicate]` |
+
+Display examples: `200* CLS` indicates BAS, `201  CLS` indicates IJB, and `202! [duplicate]` indicates that both formats exist. LOAD/LRUN read IJB for a duplicate slot and retain both files.
+
+Slots remain 200–299. The optional second SAVE argument accepts only 0 (binary, default) or 1 (text). Text mode is not supported for internal Flash or EEPROM slots.
+
+Firmware SAVE maintains one file per slot. `SAVE200,1` saves and verifies BAS, then deletes the old IJB. `SAVE200` saves and verifies IJB, then deletes the old BAS. After `NEW`, either SAVE form deletes both formats for that slot. Deleting an absent slot succeeds. Successful deletion displays `Deleted`.
+
+BAS files are written with CRLF endings. Import accepts CRLF, LF, CR, no final newline, and an optional UTF-8 BOM with an ASCII body. Use ascending line numbers from 1 to 32767, followed by one space or tab and the source text. Blank lines are ignored. Duplicate or descending numbers, empty source lines, NUL bytes, and overlong lines are rejected. BAS files may be up to 8192 bytes, but the converted internal program must fit in 4096 bytes. Each source line body may be up to 254 bytes.
+
+ASCII source can be edited on a PC. Non-ASCII characters retain the native IchigoJam character codes; conversion to or from Shift_JIS or UTF-8 Japanese is not implemented.
+
+RAM is replaced only after successful reading, conversion, and validation. If both formats exist, LOAD/LRUN prefer IJB and never delete either file during reading. If IJB is invalid or unreadable, an error is returned instead of silently switching to BAS. SAVE can repair the slot by writing the selected format and deleting the other. Invalid BAS content also causes an error. BAS `Saved` reports text file bytes. IJB `Saved` and both formats' `Loaded` report internal program bytes. New file errors: 55 = invalid BAS format, 56 = internal program exceeds capacity.
+
+Writes and deletions retain sector read-back verification and FAT mirror updates. After a write failure, run SDON again. Power loss may still damage files or filesystem metadata. If writing or cleanup fails during a format switch, SAVE reports an error and both files may remain. Subsequent LOAD/LRUN still prefer IJB and do not delete either file. BAS supports up to 16 clusters; IJB retains its 8-cluster limit. BAS processing adds an 8KiB temporary buffer.
+
+Revision 16131 was built and functionally tested on Pico 2 / RP2350 with HSTX DVI on 2026-10-15. RP2040 SD support remains unverified.
+
+### BAS Save and Load Example
+
+Choose an unused slot if slot 202 already holds important files.
+
+```basic
+CLS
+SDON
+NEW
+10 CLS
+20 PRINT "SD BAS OK"
+30 END
+SAVE202,1
+NEW
+LOAD202
+LIST
+RUN
+```
 
 ## Version Identification
 
@@ -295,7 +340,7 @@ The original IchigoJam BASIC version remains **1.6.1**. The final two digits of 
 | Platform | `VER()` | `VER(1)` |
 | --- | --- | --- |
 | Raspberry Pi Pico / RP2040 | `16116` | `8` |
-| Raspberry Pi Pico 2 / RP2350 | `16130` | `9` |
+| Raspberry Pi Pico 2 / RP2350 | `16131` | `9` |
 
 Example for Pico 2:
 
@@ -305,7 +350,7 @@ CLS
 ? VER(1)
 ```
 
-Expected output: `16130`, then `9`.
+Expected output: `16131`, then `9`.
 
 ---
 
@@ -394,11 +439,10 @@ For distribution, the same UF2 is saved under the name `GivetakeJam_P.uf2`.
   - `MD5`: `1865CF3376720FB8050E2158087A2D16`
   - `SHA-1`: `72C3A41A9D976858646DFE3103C6973098AAC5C8`
 ## Raspberry Pi Pico 2 / RP2350 Firmware / Checksum
-### Write this firmware to Raspberry Pi Pico 2 / RP2350.
 - `GivetakeJam_P.uf2`
-  - `SHA-256`: `F64CEEB28BCBE274E6EA3DA329590D4A67A3FF924AABC2E8CBCAFD36B56E51E2`
-  - `MD5`: `C890CF1365426FBE0A5D994A445ED5A6`
-  - `SHA-1`: `D917DE20A65255F7B7851C86528B24B83C94E942`
+  - SHA-256: `6D0BC0DDB71B09882E4D6BC86297E2528F68924D40326B59A61D12A265FB65C0`
+  - MD5: `4B87887BE55478240AE46C3DF3EFC583`
+  - SHA-1: `BA808F3318206145A27F1C02CA0F512DA5A6F4C0`
 
 ## Test Programs
 - `ARRAY_VAR_TOTAL_TEST.BAS`
@@ -453,9 +497,8 @@ Press `R` to restore the default firmware palette with `PAL RESET`.
 - For stable IR reception, repeat filtering is recommended in BASIC
 - SD card access
   - SD program slots are limited to 200–299 (100 programs). This range is defined by the firmware, rather than by SD card capacity or RAM size. Supporting more slots requires firmware changes.
-  - Initialization and transfers are fixed at **100kHz** based on prototype results. SD uses polling rather than DMA and does not disable interrupts across initialization/transfers.
-  SDON reserves CS on IN3 / GP6 and SPI on GP8, GP10, and GP11; conflicting OUT/PWM/IR.IN/CLO operations return File error. While SD is enabled, IN3 is configured as an output to control CS. IN(3) reads the CS level, so IN3 cannot be used for external input.
-  - Supported cards use FAT32 with 512-byte sectors. The FAT32 volume may be inside an MBR primary partition or occupy the whole card without a partition table. Programs are saved at the top level of the card, outside folders, using names with up to eight characters and extensions with up to three characters: `P200.IJB` through `P299.IJB`. FAT12/FAT16, exFAT, GPT, extended partitions, subfolders and root-directory growth are not implemented. Root scans stop at 256 sectors / 32 clusters. Overwritten existing files are limited to 4096 bytes / 8 clusters.
+  - Initialization and transfers are fixed at **100kHz** based on prototype results. SD uses polling rather than DMA and does not disable interrupts across initialization/transfers. SDON reserves CS on IN3 / GP6 and SPI on GP8, GP10, and GP11; conflicting OUT/PWM/IR.IN/CLO operations return File error. While SD is enabled, IN3 is configured as an output to control CS. IN(3) reads the CS level, so IN3 cannot be used for external input.
+  - Supported cards use FAT32 with 512-byte sectors. The FAT32 volume may be inside an MBR primary partition or occupy the whole card without a partition table. Programs are saved at the top level of the card, outside folders, using names with up to eight characters and extensions with up to three characters: `P200.IJB` through `P299.IJB` for binary files, or `P200.BAS` through `P299.BAS` for text files. FAT12/FAT16, exFAT, GPT, extended partitions, subfolders and root-directory growth are not implemented. Root scans stop at 256 sectors / 32 clusters. Existing IJB files are limited to 4096 bytes / 8 clusters; BAS files support 8192 bytes / 16 clusters.
 
   - Sector reads verify CRC16. SAVE writes new clusters, reads back and compares every sector, changes the directory, then frees the old chain. If power is lost or the card is removed during SAVE, the program file or the card's file-management information may be damaged. Do not switch off power or remove the card until saving is complete, and back up important data. Without an RTC, file dates use 1980-01-01.
 
@@ -486,3 +529,4 @@ Givetakewinwin
 - Updated on 2026-08-28 for Raspberry Pi Pico / RP2040 and Raspberry Pi Pico 2 / RP2350 / Fixed `STOP` command to report `Break in line` instead of `Syntax error in line`.
 - Updated on 2026-10-11: Added `SDON` and `SDOFF` for program storage on SD cards.
 - Updated on 2026-10-11, revision 16130: Changed CS to IN3 / GP6 with direct active-LOW control and a 10kΩ pull-up.
+- 2026-10-15, revision 16131: Added BAS export/import, single-file-per-slot format replacement, deletion on empty SAVE, FILES format marks, and IJB-priority loading for duplicate slots. Built and hardware-tested on RP2350.

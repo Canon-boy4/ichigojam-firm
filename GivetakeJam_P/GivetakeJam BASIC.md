@@ -3,7 +3,7 @@
 
 ![Platform](https://img.shields.io/badge/platform-Raspberry%20Pi%20Pico-blue)
 ![Language](https://img.shields.io/badge/language-BASIC-orange)
-![Version](https://img.shields.io/badge/VER()-16130-brightgreen)
+![Version](https://img.shields.io/badge/VER()-16131-brightgreen)
 ![Status](https://img.shields.io/badge/status-RP2350%20hardware%20tested-success)
 
 ## Overview / 概要
@@ -17,7 +17,7 @@ This firmware enhances program capacity, expands array variables, improves exter
 
 ## Version / バージョン
 
-The original IchigoJam BASIC version remains **1.6.1**. The current extension identifiers are `16116` for RP2040 and `16130` for RP2350.
+The original IchigoJam BASIC version remains **1.6.1**. The current extension identifiers are `16116` for RP2040 and `16131` for RP2350.
 
 - `16100` : original base version
 - `16112` : infrared receiver build
@@ -34,8 +34,8 @@ The original IchigoJam BASIC version remains **1.6.1**. The current extension id
 - `16116` : RP2040 build fixed `STOP` command to report `Break in line` instead of `Syntax error in line`.
 - `16128` : RP2350 build fixed `STOP` command to report `Break in line` instead of `Syntax error in line`.
 - `16129` : Added `SDON` and `SDOFF` for program storage on SD cards (Pico 2 / RP2350 hardware tested; RP2040 SD support unverified).
-
 - `16130` : Changed CS to IN3 / GPIO6 with direct active-LOW control and a 10kΩ pull-up.
+- `16131` : Added BAS export/import, single-file-per-slot format replacement, deletion on empty SAVE, FILES format marks, and IJB-priority loading for duplicate slots.
 
 ## Highlights / 主な特徴
 
@@ -49,7 +49,15 @@ The original IchigoJam BASIC version remains **1.6.1**. The current extension id
 - `COLOR` MSX-style text color command for RP2350 HSTX DVI output
 - External EEPROM support (`24LC64` / `24LC256` / `24FC1025`)
 - RP2350 build: default keyboard layout is Japanese when the keyboard setting flash area is unset.
-- SD expansion: FAT32 program slots `200..299`, 4096 bytes per file, 100kHz SPI, and runtime `SDON` / `SDOFF` switching. Pico 2 / RP2350 hardware tested; RP2040 SD support remains unverified.
+- SD expansion: FAT32 program slots `200..299`, 4096-byte IJB files or variable-length BAS files (up to 8192 bytes; converted programs up to 4096 bytes), 100kHz SPI, and runtime `SDON` / `SDOFF` switching. Pico 2 / RP2350 hardware tested; RP2040 SD support remains unverified.
+
+## SD Program Formats / SD保存形式
+
+`SAVE200` saves binary `P200.IJB`; `SAVE200,1` saves editable text `P200.BAS`. Successful SAVE removes the other format for the same slot. Saving an empty program deletes both formats for that slot.
+
+LOAD/LRUN automatically read IJB when present, otherwise BAS. If a PC has placed both formats on the card, LOAD/LRUN prefer IJB and retain both files. FILES shows BAS with `*`, IJB with a space, and a duplicate slot with `! [duplicate]`.
+
+英数字はPCで編集できます。日本語・独自記号の文字コード変換は未対応です。詳しい形式・制限は日英READMEを参照してください。
 
 ## Memory Map / メモリーマップ
 
