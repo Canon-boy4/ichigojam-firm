@@ -1,14 +1,20 @@
 # GivetakeJam BASIC
+
 ![Platform](https://img.shields.io/badge/platform-Raspberry%20Pi%20Pico-blue)
 ![Language](https://img.shields.io/badge/language-BASIC-orange)
 ![License](https://img.shields.io/badge/license-IchigoJam-green)
-![Version](https://img.shields.io/badge/version-16131-brightgreen)
-![Status](https://img.shields.io/badge/status-RP2350%20hardware%20tested-success)
+![Version](https://img.shields.io/badge/version-16132-brightgreen)
+![Status](https://img.shields.io/badge/status-RP2040%20%2F%20RP2350%20hardware%20tested-success)
 
 ## プログラム容量の拡張、配列変数の拡張、外部EEPROM対応の改善、NEC方式の赤外線受信コマンド、環境測定コマンド、カラー表示・パレット変更・色属性コマンドの追加、およびSDカードへのプログラム保存機能追加を行い、従来のIchigoJam P BASICの互換性を維持しながら機能強化しています。
+
 ### Pico 2 / RP2350版の配列領域拡張
+
 Pico 2 / RP2350版では、増加RAMを利用して配列変数領域 VAR2 を拡張しています。
+
 ## 機能 / 変更点
+
+- 現行版：RP2040は`16117`、RP2350は`16132`。両機種でSDコピー命令に対応します。
 - プログラム容量を 1024 → 4096バイト に拡張
 - 内部保存プログラム本数
   - Raspberry Pi Pico / RP2040版: 25本
@@ -95,6 +101,8 @@ Pico 2 / RP2350版では、増加RAMを利用して配列変数領域 VAR2 を�
     - 外部I2C EEPROMのスロット`100`〜`131`
     - 外部EEPROMからの`LRUN`
 - RP2350 / Pico 2 HSTX DVI テキスト出力向けに、MSX風の `COLOR f[,b[,c]]` 命令を追加
+  - 16132版から省略形`COL f[,b[,c]]`も使えます。COLORと引数・動作は同じです。既存の`CLO`とは別の命令です。RP2040版ではCOLOR/COLとも非対応です。
+  - COLOR/COLは以降に書く文字の色を設定します。現在のDRAWは色属性を更新しません。単色の描画はCOLORの後にCLS、多色の描画は`ATTR x/2,y/2,a`で描画位置の色を指定します。色属性は文字1マス、すなわちDRAWの横2×縦2点で共有します。`a`は前景色番号＋背景色番号×16です。
   - Raspberry Pi Pico / RP2040版では非対応で、実行すると `Syntax error` になります。
   - `f`: 前景色 0〜15
   - `b`: 背景色 0〜15
@@ -220,20 +228,57 @@ Pico 2 / RP2350版では、増加RAMを利用して配列変数領域 VAR2 を�
     RUN
     ```
 
-  - 16131版までのSD実機確認は **Pico 2 / RP2350・HSTX DVI版** が対象です。RP2040でのSD対応は未検証です。SD処理は現在共通ソースに追加されており、機種別の完全分離は行っていません。
+  - **Pico / RP2040版（16117）とPico 2 / RP2350・HSTX DVI版（16132）でビルド・バージョン・SDコピーの実機確認済みです。** SD処理は共通ソースを使用します。確認した範囲は後述の「実機確認」を参照してください。
   - カード最上位に、内部形式は `P200.IJB`～`P299.IJB`、テキスト形式は `P200.BAS`～`P299.BAS` として保存します。IJBファイルは **4096バイトのバイナリ内部形式** で、テキストの `.BAS` とは異なります。IJBのSavedと両形式のLoaded表示は内部プログラム使用量、BASのSaved表示はテキストファイル長です。SD読み込み失敗時は現在のプログラムを保持します。
   - SDON中のFILES／FILES0はSD一覧、SDOFF中は従来のFlash／EEPROM表示です。番号や範囲を明示すると指定先を表示し、FILES20は内蔵Flashの0～20、FILES90,220はSDON中にFlash・EEPROM・SDをまとめて表示します。SDOFF中にSD範囲を指定するとFile errorです。SD未保存番号と未割り当て番号は省略します。
 
-## 16131版：BAS保存・自動読み込み・空保存による削除
+## SDコピー命令（RP2040：16117／RP2350：16132）
+
+`SD 開始番号,終了番号,コピー先開始番号`で、内蔵FlashとSDカードのプログラムを双方向にコピーします。SDON中に使用してください。
+
+| 命令 | コピー範囲 | 対応機種 |
+| --- | --- | --- |
+| `SD 10,20,230` | 内蔵Flash 10～20番 → SD 230～240番 | Pico / Pico 2 |
+| `SD 230,240,10` | SD 230～240番 → 内蔵Flash 10～20番 | Pico / Pico 2 |
+| `SD 20,30,230` | 内蔵Flash 20～30番 → SD 230～240番 | Pico 2のみ |
+| `SD 23,23,298` | 内蔵Flash 23番 → SD 298番（1本） | Pico / Pico 2 |
+
+- 内蔵Flashの保存番号はRP2040が0～24、RP2350が0～99です。SDは両機種とも200～299です。
+- コピー元・コピー先の範囲全体を先に検査します。範囲外、開始番号より小さい終了番号、Flash同士やSD同士の指定は、書込み開始前にエラーになります。EEPROMはコピー対象外です。
+- コピー先にプログラムがあれば上書きします。コピー元が未保存または空の場合は、その番号だけをスキップしてコピー先を保持します。後続の番号対応は詰めません。
+- SDへはIJB形式で保存し、保存・照合に成功した後に同番号のBASを削除します。
+- SDからはIJBを優先し、IJBがない場合だけBASを読み込みます。コピー元のファイルは削除しません。IJBが不正・読み取り失敗の場合はBASへ切り替えずエラーにします。
+- 成功時・エラー時とも、編集中のRAMプログラムと`FILE()`を保持します。コピー後の実行は必要に応じてLOAD/LRUNで行います。
+- 完了した番号は`Copied 10 -> 230`、空のコピー元は`Skipped 11`と表示します。途中の読み書きエラーでは失敗したコピー元・コピー先番号を表示して停止し、完了分は残ります。書込み失敗後はSDONで再初期化してください。
+- コピー全体を一括で取り消す機能はありません。書込み中の電源断・カード取り外しに対する完全な保護もありません。
+
+### コピー例
+
+内蔵Flash 10～20番をSD 230～240番へコピーします。コピー先の既存プログラムは上書きされます。
+
+```basic
+CLS
+SDON
+SD 10,20,230
+FILES 230,240
+```
+
+逆方向は`SD 230,240,10`です。こちらは内蔵Flash 10～20番を上書きします。
+
+### 実機確認（2026年10月27日）
+
+RP2040版16117とRP2350版16132で、ビルド、バージョン表示、基本コピー動作を確認済みです。加えて、SDOFF中のエラーとコピー先保持、範囲外指定による書込み前の停止、Flash同士・SD同士の拒否、空元のスキップとコピー先保持、成功時・エラー時のRAMプログラムとFILE()保持を確認済みです。書込み途中の電源断など、障害を強制発生させる試験の合格を示すものではありません。
+
+## BAS保存・自動読み込み・空保存による削除
 
 | 命令 | SD上の動作 |
 | --- | --- |
 | `SAVE200` または `SAVE200,0` | `P200.IJB`へ従来の4096バイト内部形式で保存 |
 | `SAVE200,1` | `P200.BAS`へLISTと同じ行番号付きテキストで保存 |
 | `LOAD200` / `LRUN200` | 指定番号にあるBASまたはIJBを自動判別して読み込む。両方ある場合はIJBを優先。読み込み時は両方とも削除しない |
-| `FILES` / `FILES200,299` | BASは`*`、IJBは空白、重複番号は`! [duplicate]`を表示 |
+| `FILES` / `FILES200,299` | BASは`*`、IJBは空白、重複番号は`![duplicate]`を表示 |
 
-表示例：`200* CLS`はBAS、`201  CLS`はIJB、`202! [duplicate]`は両形式の存在を示します。重複番号のLOAD/LRUNはIJBを読み込み、どちらのファイルも削除しません。
+表示は「番号・形式マーク・先頭行」で、形式マークの後に空白を追加しません。表示例：`200*CLS`はBAS、`201 CLS`はIJB、`202![duplicate]`は両形式の存在を示します。IJBの形式マークは空白1文字です。見出しの表示幅は従来どおりです。重複番号のLOAD/LRUNはIJBを読み込み、どちらのファイルも削除しません。
 
 番号は200～299です。第2引数は省略または0がIJB、1がBASで、それ以外はエラーです。内蔵Flash／EEPROMに対する第2引数1は対応しません。
 
@@ -247,7 +292,7 @@ BASの読み込み・変換・形式検査が成功した後だけRAM上のプ�
 
 保存・削除はセクター書き込み後の読み戻し照合とFATコピーの更新を行います。途中失敗時は再度SDONが必要です。形式切り替えは新形式の確定後に旧形式を削除するため、途中失敗で両形式が残ることがあります。電源断に対する完全な保護はありません。BASは最大16クラスタ、IJBは従来どおり最大8クラスタです。BAS処理用に追加の8KiB一時領域を使用します。
 
-RP2040でのSD機能は引き続き未検証です。
+RP2040版でも、IJB/BAS保存・読み込み・実行、PC編集後の読み込み、空保存による削除、4K近傍、SDON/SDOFF反復、内蔵Flash・配列の回帰確認、重複時のIJB優先と両ファイル保持を実機確認済みです。
 
 ### BAS保存・PC編集後のLOAD確認
 
@@ -268,20 +313,22 @@ RUN
 ```
 
 - 拡張版識別のため `VER()` を変更
-  - Raspberry Pi Pico / RP2040版: `16116`
-  - Raspberry Pi Pico 2 / RP2350版: `16131`
+  - Raspberry Pi Pico / RP2040版: `16117`
+  - Raspberry Pi Pico 2 / RP2350版: `16132`
   - 使用例 BASIC
     - Raspberry Pi Pico / RP2040版:
     ```sh
+    CLS
     ? VER()
-    16116
+    16117
     ? VER(1)
     8
     ```
     - Raspberry Pi Pico 2 / RP2350版:
     ```sh
+    CLS
     ? VER()
-    16131
+    16132
     ? VER(1)
     9
     ```
@@ -289,12 +336,17 @@ RUN
     - Raspberry Pi Pico / RP2040版: `8`
     - Raspberry Pi Pico 2 / RP2350版: `9`
 ---
+
 ## RP2040版のビルド環境（Raspberry Pi Pico）
 
 IchigoJam P BASICを4K版へ拡張したものです。以下のライブラリ設定はRP2040版用です。RP2350版は後述の専用手順を使用してください。
+
 ## 環境構築
+
 - "CMake"と"GCC"をインストールする
+
 ## IchigoJam_P のコンパイル環境
+
 - IchigoJam_P のディレクトリーで作成します。
 - 以下のライブラリを`IchigoJam_P`ディレクトリ直下に置く
     - "IchigoJam_BASIC": 1つ上の階層にある`IchigoJam_BASIC`ディレクトリをコピーする
@@ -303,32 +355,44 @@ IchigoJam P BASICを4K版へ拡張したものです。以下のライブラリ�
     - "PicoDVI": https://github.com/mlorenzati/PicoDVI.git `579eecc`のコミットを使用(別のコミットを使用すると正しく動作しない)
 - 以下のパスを通す
     ```sh
-    PICO_SDK_PATH=foo/IchigoJam_P/pico-sdk
-    PICO_EXTRAS_PATH=foo/IchigoJam_P/pico-extras
+    export PICO_SDK_PATH=/foo/IchigoJam_P/pico-sdk
+    export PICO_EXTRAS_PATH=/foo/IchigoJam_P/pico-extras
     ```
 詳細は以下を参照
 [Raspberry Pi Picoをセットアップしよう](https://datasheets.raspberrypi.com/pico/getting-started-with-pico-JP.pdf)
+`/foo/IchigoJam_P`は、ご自分のビルド用プロジェクトの絶対パスに変更してください。
+
 ## ビルド
 ```sh
 cd IchigoJam_P
 mkdir build
 cd build
-cmake ..
-make
+cmake .. \
+  -DPICO_BOARD=pico \
+  -DPICO_PLATFORM=rp2040 \
+  -DPICO_SDK_PATH=/foo/IchigoJam_P/pico-sdk \
+  -DPICO_EXTRAS_PATH=/foo/IchigoJam_P/pico-extras
+cmake --build . -j 8
 ```
 `IchigoJam_P.uf2`ファイルが作成できたらpicoに書き込む
+
 ## 動作がおかしくなったら
+
 `build`ディレクトリを消して作り直してみる
 特に映像の出力が正常に行われなくなることが多い
+
 ## TODO
+
 高解像度に対応する(TVでも使えるようにするため)
+
 ## 4K版ソースの反映
 
-`GivetakeJam_P`に用意した以下の変更ファイルを、ビルド用`IchigoJam_P`の対応する場所へ反映します。
+以下の変更ファイルをビルド用`IchigoJam_P`の対応する場所へ反映します。リポジトリ直下の`IchigoJam_BASIC`と、ビルド用の`IchigoJam_P/IchigoJam_BASIC`は同じ内容にそろえてください。
 - `IchigoJam_BASIC`
   - `basic.h`
   - `ram.h`
   - `tokens_v1.5.h`
+  - `command_sd_copy.h`（SDコピー命令、日本語コメント付き）
 - `src`
   - `config.h`
   - `i2ceeprom.h`
@@ -337,8 +401,23 @@ make
   - `all_includes.h`（SD統合）
   - `sd_card.h`（日本語コメント付きSDドライバー）
 - ルートの `CMakeLists.txt`：SD用 `hardware_spi` のリンク設定
-- IchigoJam P の時の様にビルドして、`IchigoJam_P.uf2`ファイルが作成できたらPicoに書き込みます。
+- ビルド方法は cd build 後、次を実行します。
+```sh
+cmake .. \
+  -DPICO_BOARD=pico \
+  -DPICO_PLATFORM=rp2040 \
+  -DPICO_SDK_PATH=/foo/IchigoJam_P/pico-sdk \
+  -DPICO_EXTRAS_PATH=/foo/IchigoJam_P/pico-extras
+```
+
+設定が成功したら、ビルドします。
+```sh
+cmake --build . -j 8
+```
+
+`IchigoJam_P.uf2`ファイルが作成できたらPicoに書き込みます。
 ---
+
 ## RP2350版のビルド（Raspberry Pi Pico 2／macOS）
 
 RP2350版はHSTX DVIを使用するため、PicoDVIライブラリは使用しません。
@@ -356,19 +435,28 @@ cd IchigoJam_P
 が生成されます。このファイルをPico 2へ書き込みます。
 
 配布用には、このUF2を `GivetakeJam_P.uf2` という名前で保存しています。
+
 ## Raspberry Pi Pico / RP2040 Firmware / Checksum
-### Raspberry Pi Pico / RP2040用の4K版ファームウェアファイルです。
-- `IchigoJam_P.uf2`
-  - SHA-256: `9E9B7D4D1E7E776BC3B4F8DE3DE078C1FAEA978F5BBCE3385320402F1F92B396`
-  - MD5: `1865CF3376720FB8050E2158087A2D16`
-  - SHA-1: `72C3A41A9D976858646DFE3103C6973098AAC5C8`
+
+- ファイル：`IchigoJam_P.uf2`
+- 今回のバージョン：`16117`
+- ファイルサイズ: 237,568 bytes
+- SHA-256: `ECDD6B997A7A67FB84D764015803EAF8A7A7C3729F00EA9014DB28722DFA775B`
+- MD5: `3FDB4FAFD828429F4650A1B57A18B637`
+- SHA-1: `33F7440D4087ADD6DCE2635F841B932700CC825C`
+
 ## Raspberry Pi Pico 2 / RP2350 Firmware / Checksum
-- `GivetakeJam_P.uf2`
-  - SHA-256: `6D0BC0DDB71B09882E4D6BC86297E2528F68924D40326B59A61D12A265FB65C0`
-  - MD5: `4B87887BE55478240AE46C3DF3EFC583`
-  - SHA-1: `BA808F3318206145A27F1C02CA0F512DA5A6F4C0`
+
+- ファイル：`GivetakeJam_P.uf2`
+- 今回のバージョン：`16132`
+- ファイルサイズ: 218,624 bytes
+- SHA-256: `7374FA5FA749414C85ACE41483286AE0C58973625C77F69ED7EB254E7F6D5A89`
+- MD5: `4A17B2328CEBEEF78D3D83676864B4AB`
+- SHA-1: `27BF73098142A8EE66BE2E849A1183FF787300A3`
+
 
 ## Test Programs
+
 - `ARRAY_VAR_TOTAL_TEST.BAS`
   - 配列変数のテストプログラムです。このテストが ALL OK で通ることを確認しています。
 - `IR_IN_TEST.BAS`
@@ -381,32 +469,53 @@ cd IchigoJam_P
   - RP2350 HSTX DVI 用の PAL / RGB332 パレット変更サンプルです。
   - カーソルキーで色番号を選択し、RGB332 パレット値を変更できます。
   - `R` キーで `PAL RESET` を実行し、ファームウェア内蔵のデフォルトパレットに戻します。
+
 ## Screenshot
+
 ### 動作環境
+
 ![screenshot](./docs/IMG_4677up.png)
+
 ### 表示画面 ( 名称, HELP表示：メモリマップ, FILES表示 )
+
 ![screenshot](./docs/IMG_4679up.png)
+
 ### IchigoJam_P 互換基板 ( GivetakeJam-P )
+
 ![screenshot](./docs/IMG_4684up.png)
+
 ### COLOR コマンド使用画面 ( ICHIGO EATER COLOR画面 )
+
 ![screenshot](./docs/IMG_4685up.png)
 ![screenshot](./docs/IMG_4690up.png)
+
 ### PAL RGB332 変更サンプル
+
 ![screenshot](./docs/IMG_4984up.png)
 `PAL_RGB332_CHANGE.BAS` は、RP2350 HSTX DVI 版の RGB332 パレットを確認・変更するためのサンプルプログラムです。
 選択中の色番号、RGB332値、R/G/B成分、前景色サンプル、背景色サンプルを表示します。
 カーソルキーで色番号の選択とパレット値の変更を行います。
 `R` キーで `PAL RESET` を実行し、ファームウェア内蔵のデフォルトパレットに戻します。
+
 ### SDカード拡張基板回路例
+
 ![SD card expander PCB](./docs/MSD_MemCard101.png)
+
 ## ライセンス / license
+
     - Copyright 2014-2025 the IchigoJam authors. All rights reserved. MIT license.  https://ichigojam.net/license
+
 ## 商標 / Trademark
+
     - IchigoJamは、株式会社jig.jpの登録商標です。(IchigoJam is a registered trademark of jig.jp co., ltd.)
     - Raspberry Pi は、Raspberry Pi財団の登録商標です。(Raspberry Pi is a registered trademark of the Raspberry Pi Foundation)
+
 ## 利用規約に同意の上、ダウンロードしてください。第三者への配布にはライセンスが必要になります。詳しくはこちら。https://pcn.club/sp/ijp/
+
     - 利用規約（IchigoJamロイヤリティフリープログラム利用規約） https://ichigojam.net/ichigojam-license.pdf
+
 ## 既知の制限 / 注意事項
+
 - プログラム最大 4096 バイト
 - 内部保存プログラム本数
   - Raspberry Pi Pico / RP2040版: 25本
@@ -425,7 +534,9 @@ cd IchigoJam_P
   - 読み取りCRCを検査します。保存は新規クラスタへ書いて各セクターを読み戻し照合した後、参照先を更新し旧領域を解放します。ただし、保存の途中で電源が切れたりカードが抜けたりすると、プログラムファイルやカード上のファイル管理情報が破損する可能性があります。保存中は電源を切ったりカードを抜いたりせず、重要なデータはバックアップしてください。RTC未使用のためファイル日付は1980-01-01です。
 ---
 ギブテクウインウイン
+
 ## 変更履歴
+
 - 2026/05/29 作成
 - 2026/07/18 Pico 2 / RP2350 HSTX DVI版を追加
 - 2026/07/29 Pico 2 配列変数を 1125 まで増加
@@ -438,3 +549,4 @@ cd IchigoJam_P
 - 2026/10/11 SDカードによるプログラム保存ができるように `SDON` と `SDOFF` を追加
 - 2026/10/11 16130版：CSをIN3／GP6の直結方式に変更。10kΩプルアップを残してMOSFETを省略。
 - 2026/10/15 16131版：SAVE n,1でBAS保存、LOAD/LRUNで形式を自動判別、形式切り替え時は旧形式を削除、空保存で番号全体を削除。FILESの形式マークと重複時のIJB優先読み込みを追加。RP2350版でビルド・実機確認済み。
+- 2026/10/27 RP2040版16117／RP2350版16132：SD命令によるFlash・SD間コピー、COL省略形、FILESの記号後の空白削除を追加。両機種でビルド・バージョン・基本コピー・指定エラー時の未書込み・空元スキップ・RAM/FILE()保持を実機確認。

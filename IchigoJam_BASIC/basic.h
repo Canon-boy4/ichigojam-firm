@@ -66,6 +66,8 @@ S_INLINE int basic_listSize();
 
 // SDON/SDOFF命令。端子の切り替えは同じファームウェア内で行う。
 static void command_sd(int enable);
+// SD 開始番号,終了番号,コピー先開始番号（内部FlashとSD間）。
+static void command_sd_copy(void);
 static int IJB_save(int n, uint8 *list, int size);								// 0:ok
 static int IJB_load(int n, uint8 *list, int sizelimit, int init); // ret:size if:-1 _g.err
 static int i2c0_init();																						/* Initialize I2C module  0:ok 1:_g.err */
@@ -746,7 +748,10 @@ int basic_execute(char *commandline)
 			break;
 			// 100
 
-		case TOKEN_SDON:
+		case TOKEN_SD_COPY:
+			command_sd_copy();
+			break;
+		case ON:
 			command_sd(1);
 			break;
 		case TOKEN_SDOFF:
@@ -770,6 +775,8 @@ int basic_execute(char *commandline)
 		case TOKEN_VIDEO:
 			command_video();
 			break;
+		// COLはCOLORと同じ引数・同じ機種対応で処理する。
+		case TOKEN_COL:
 		case TOKEN_COLOR:
 			command_color();
 			break;
@@ -1702,9 +1709,9 @@ static int16 token_expression5()
 		int n = token_opt1();
 		if (n == 0)
 #ifdef PICO_RP2350
-			return IJB_VER * 100 + IJB_BUILD + 31; // RP2350: VER()=16131、BAS保存・自動LOAD・空保存削除
+			return IJB_VER * 100 + IJB_BUILD + 32; // RP2350：SDコピー・COL省略形・FILES表示改善
 #else
-			return IJB_VER * 100 + IJB_BUILD + 16; // Pico / RP2040版識別用: VER() = 16116
+			return IJB_VER * 100 + IJB_BUILD + 17; // RP2040：SDコピー・COL省略形・FILES表示改善
 #endif
 
 		if (n == 3)
@@ -3439,12 +3446,12 @@ static int sd_files_print_row(int number) {
  int status=sd_files_preview(number,preview,sizeof(preview));
  if(status<0){put_str("SD file error ");put_num(sd_file_error);put_chr('\n');command_error(ERR_FILE_ERROR);return -1;}
  if(!status)return 0;
- int width=put_num(number);put_chr(status==4 ? '!' : (sd_files_is_bas[number-200] ? '*' : ' '));put_chr(' ');
+ int width=put_num(number);put_chr(status==4 ? '!' : (sd_files_is_bas[number-200] ? '*' : ' ')); // 記号直後に余分な空白を入れない。
  if(status==2)put_str("[empty]");
  else if(status==3)put_str("[invalid]");
  else if(status==4)put_str("[duplicate]");
  else {
-  int limit=SCREEN_W-4-width;if(limit<0)limit=0;
+  int limit=SCREEN_W-3-width; // 従来表示と同じ見出し幅へ戻す。if(limit<0)limit=0;
   preview[limit]=0;put_str(preview);
  }
  put_chr('\n');return 1;
@@ -5955,6 +5962,9 @@ S_INLINE void command_dac()
 #endif
 
 // __BASIC_H__
+// GIVETAKE_SD_COPY_COL_UPDATE_20261027
+#include "command_sd_copy.h"
+
 #endif
 
 

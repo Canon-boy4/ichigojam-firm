@@ -1,12 +1,15 @@
 # GivetakeJam BASIC
+
 ![Platform](https://img.shields.io/badge/platform-Raspberry%20Pi%20Pico-blue)
 ![Language](https://img.shields.io/badge/language-BASIC-orange)
 ![License](https://img.shields.io/badge/license-IchigoJam-green)
-![Version](https://img.shields.io/badge/version-16131-brightgreen)
-![Status](https://img.shields.io/badge/status-RP2350%20hardware%20tested-success)
+![Version](https://img.shields.io/badge/version-16132-brightgreen)
+![Status](https://img.shields.io/badge/status-RP2040%20%2F%20RP2350%20hardware%20tested-success)
 
 Extended IchigoJam BASIC for Raspberry Pi Pico with a 4096-byte program area, expanded arrays, improved external EEPROM support, NEC infrared reception, environmental sensing, color display / palette / attribute commands, and program storage on SD cards.
+
 ## Highlights
+
 - Extends IchigoJam BASIC 1.6.1 while retaining compatibility with its original BASIC design
 - Program size expanded from 1024 bytes to 4096 bytes
 - Internal flash storage slots
@@ -19,10 +22,13 @@ Extended IchigoJam BASIC for Raspberry Pi Pico with a 4096-byte program area, ex
 - Added `IR.IN` command for NEC infrared reception
 - Added `ENV.IN` command for AHT20 + BMP280 environment sensing
 - Fixed `WS.LED` array access for extended arrays and added bounds checking
-- `VER()` returns `16131` on Raspberry Pi Pico 2 / RP2350
+- `VER()` returns `16117` on Raspberry Pi Pico / RP2040 and `16132` on Raspberry Pi Pico 2 / RP2350
+- Added `SD first,last,destination` for copying programs between internal Flash and SD on both boards
+- Added `COL` as an alias for `COLOR` on RP2350
 - Added `COLOR f[,b[,c]]` command for HSTX DVI text colors
 - Added `PAL n,v`, `PAL RESET`, and `PAL(n)` for RGB332 palette control
 - Added `ATTR x,y,a` and `ATTR(x,y)` for text color attribute control
+
 ## Memory Map
 ```text
 #000 CHAR
@@ -32,8 +38,11 @@ Extended IchigoJam BASIC for Raspberry Pi Pico with a 4096-byte program area, ex
 #C00 VAR2
 #E00 LIST (RP2040)
 #1400 LIST (RP2350)
+
 ```
+
 ## Features / Changes
+
 - Expanded program size from 1024 bytes to 4096 bytes per program
 - Internal flash storage: 25 slots on RP2040 and 100 slots on RP2350
 - Extended array variables
@@ -62,18 +71,23 @@ Extended IchigoJam BASIC for Raspberry Pi Pico with a 4096-byte program area, ex
 - Added `IR.IN` command for HX1838-compatible NEC infrared receiver modules
 - Added `ENV.IN` command for AHT20 + BMP280 environment sensing
 - Built-in `HELP` memory map updated
-- `VER()` returns `16116` on Raspberry Pi Pico / RP2040
-- `VER()` returns `16131` on Raspberry Pi Pico 2 / RP2350
+- `VER()` returns `16117` on Raspberry Pi Pico / RP2040
+- `VER()` returns `16132` on Raspberry Pi Pico 2 / RP2350
 - Platform identification by `VER(1)`
   - Raspberry Pi Pico / RP2040: `8`
   - Raspberry Pi Pico 2 / RP2350: `9`
+
 ## IR.IN Command
+
 `IR.IN` receives NEC-format infrared codes from an HX1838-compatible receiver.
+
 ### Syntax
 ```basic
 IR.IN port,[n]
 ```
+
 ### Result Layout
+
 - `[n+0]` = raw byte 0
 - `[n+1]` = raw byte 1
 - `[n+2]` = raw byte 2
@@ -83,6 +97,7 @@ IR.IN port,[n]
 - `[n+6]` = mode
   - `0` = standard NEC
   - `1` = NEC extended
+
 ### Example
 ```basic
 10 CLS: ' IR.IN Test Program
@@ -95,16 +110,21 @@ IR.IN port,[n]
 80 WAIT 5
 90 GOTO 20
 ```
+
 ### Example Output
 ```text
 807F01FE
 ```
+
 ### Notes
+
 - HX1838 output is assumed to be idle HIGH
 - The 38kHz carrier is already demodulated by the receiver module
 - For stable operation, error filtering and repeat filtering are recommended
 - The timing-critical decode section is protected after leader detection
+
 ## Raspberry Pi Pico 2 / RP2350 Support
+
 The Raspberry Pi Pico 2 / RP2350 build supports HSTX DVI video output.
 Confirmed features on Pico 2:
 - HSTX DVI video output
@@ -125,6 +145,7 @@ Confirmed features on Pico 2:
   - Internal flash slots `0` to `99`
 - External I2C EEPROM slots `100` to `131`
 - `LRUN` from external EEPROM
+
 ### Pico 2 IR.IN Example
 ```basic
 10 CLS
@@ -134,9 +155,14 @@ Confirmed features on Pico 2:
 ```
 For the Pico 2 HSTX DVI build, HSTX video uses DMA channels 0 and 1.
 The RP2350 `IR.IN` PIO DMA implementation uses DMA channel 10, so it does not conflict with HSTX video DMA.
-## COLOR Command
-`COLOR` sets text colors for the RP2350 / Pico 2 HSTX DVI build.
-On the Raspberry Pi Pico / RP2040 build, `COLOR` is not supported and results in a syntax error.
+
+## COLOR / COL Commands
+
+`COLOR` sets text colors for the RP2350 / Pico 2 HSTX DVI build. Revision 16132 adds `COL f[,b[,c]]` as an alias with the same arguments and behavior. `CLO` is a different command.
+On the Raspberry Pi Pico / RP2040 build, neither `COLOR` nor `COL` is supported; both return a syntax error.
+
+COLOR/COL select colors for subsequent character output. DRAW currently changes pixels without updating color attributes. For one-color drawing, use COLOR followed by CLS. For multiple colors, set the cell attribute with `ATTR x/2,y/2,a` at the drawing position. One character cell, equivalent to 2×2 DRAW pixels, shares one attribute. The attribute value is foreground color + background color × 16.
+
 ### Syntax
 ```basic
 COLOR f
@@ -147,6 +173,7 @@ COLOR f,b,c
 - `b`: background color, 0-15
 - `c`: border/surrounding color, 0-15
 The current implementation affects newly printed text and `CLS`; existing text is not recolored retroactively.
+
 ### Example
 ```basic
 CLS
@@ -157,9 +184,12 @@ COLOR 10,1,1
 COLOR 8,1,1
 ?"RED"
 ```
+
 ## PAL Command
+
 `PAL` controls the RGB332 palette for the RP2350 / Pico 2 HSTX DVI build.
 On the Raspberry Pi Pico / RP2040 build, `PAL` is not supported and results in a syntax error.
+
 ### Syntax
 ```basic
 PAL n,v
@@ -171,12 +201,14 @@ PAL RESET
 - `PAL n,v`: sets the RGB332 palette value for color number `n`
 - `PAL(n)`: returns the current RGB332 palette value for color number `n`
 - `PAL RESET`: restores the default firmware palette
+
 ### RGB332 Format
 ```text
 bit7..5 : Red   0..7
 bit4..2 : Green 0..7
 bit1..0 : Blue  0..3
 ```
+
 ### Example
 ```basic
 10 CLS
@@ -188,9 +220,12 @@ bit1..0 : Blue  0..3
 70 COLOR 10,1,1
 80 ?"PAL RESET OK"
 ```
+
 ## ATTR Command
+
 `ATTR` changes or reads the color attribute of an already displayed text cell on the RP2350 / Pico 2 HSTX DVI build.
 On the Raspberry Pi Pico / RP2040 build, `ATTR` is not supported and results in a syntax error.
+
 ### Syntax
 ```basic
 ATTR x,y,a
@@ -200,12 +235,14 @@ A=ATTR(x,y)
 - `a`: text color attribute value, 0-255
 - lower 4 bits: foreground color
 - upper 4 bits: background color
+
 ### Attribute Format
 ```basic
 A=FG+BG*16
 FG=A&#F
 BG=A>>4
 ```
+
 ### Example
 ```basic
 10 CLS
@@ -216,13 +253,18 @@ BG=A>>4
 60 ?ATTR(5,5)
 ```
 This example changes the displayed `A` to white text on a red background.
+
 ## ENV.IN Command
+
 `ENV.IN` reads temperature and humidity from AHT20 and pressure from BMP280 over I2C.
+
 ### Syntax
 ```basic
 ENV.IN [n]
 ```
+
 ### Result Layout
+
 - `[n+0]` = temperature from AHT20 in 0.1°C units
 - `[n+1]` = humidity from AHT20 in 0.1%RH units
 - `[n+2]` = pressure from BMP280 in 0.1 hPa units
@@ -231,13 +273,16 @@ ENV.IN [n]
 - `[n+5]` = status flag
   - bit0 = AHT20 OK
   - bit1 = BMP280 OK
+
 ### Error Codes
+
 - `0` = success
 - `1` = AHT20 not found
 - `2` = BMP280 not found (not fatal if AHT20 is available)
 - `3` = AHT20 measurement failed
 - `4` = BMP280 read failed
 - `5` = BMP280 chip ID mismatch
+
 ### Example
 ```basic
 10 CLS: ' ENV.IN Test Program
@@ -283,23 +328,59 @@ LOAD202
 LIST
 RUN
 ```
-SD features through revision 16131 have been tested on Pico 2 / RP2350 with HSTX DVI.
-**RP2040 SD support remains unverified.** The SD code is currently shared and has not been fully separated by processor.
+**Builds, version identifiers, and SD program copying have been tested on both Pico / RP2040 (16117) and Pico 2 / RP2350 with HSTX DVI (16132).** SD processing uses shared source code. See Hardware Validation below for the tested scope.
 
 Programs are stored at the top level of the card as `P200.IJB` through `P299.IJB` (binary) or `P200.BAS` through `P299.BAS` (text). Each IJB file contains a **4096-byte binary BASIC program image**, rather than a text `.BAS` file. IJB `Saved` and both formats' `Loaded` show internal program bytes; BAS `Saved` shows text file bytes. If an SD load fails, the current program is preserved.
 
 After `SDON`, `FILES` and `FILES0` list existing SD programs. After `SDOFF`, they return to their original Flash / EEPROM behavior. Explicit numbers retain their meaning: `FILES20` lists internal Flash slots 0–20, and `FILES90,220` lists Flash, EEPROM, and SD slots while SD is enabled. Requesting an SD range while SD is disabled returns `File error`. Missing SD files and unassigned slot numbers are omitted.
 
-## Revision 16131: BAS Export, Automatic Import, and Deletion
+## SD Copy Command (RP2040: 16117 / RP2350: 16132)
+
+Use `SD first,last,destination` to copy programs between internal Flash and the SD card in either direction. Run SDON first.
+
+| Command | Copy range | Supported boards |
+| --- | --- | --- |
+| `SD 10,20,230` | Internal Flash 10–20 → SD 230–240 | Pico / Pico 2 |
+| `SD 230,240,10` | SD 230–240 → internal Flash 10–20 | Pico / Pico 2 |
+| `SD 20,30,230` | Internal Flash 20–30 → SD 230–240 | Pico 2 only |
+| `SD 23,23,298` | Internal Flash 23 → SD 298 (one program) | Pico / Pico 2 |
+
+- Internal Flash slots are 0–24 on RP2040 and 0–99 on RP2350. SD slots are 200–299 on both.
+- The complete source and destination ranges are checked before writing. Out-of-range slots, an end before the start, Flash-to-Flash, and SD-to-SD requests are rejected before any write. EEPROM is not a copy endpoint.
+- Existing destination programs are overwritten. Missing or empty source slots are skipped without changing their destinations. Subsequent slot mappings are not shifted.
+- Copies to SD use IJB format. An existing BAS file for that slot is deleted only after the new IJB is saved and verified.
+- Copies from SD prefer IJB, otherwise BAS. Source files are retained. Invalid or unreadable IJB causes an error instead of falling back to BAS.
+- The program being edited in RAM and `FILE()` are retained on success and error. Use LOAD/LRUN separately when you want to load or run a copied program.
+- Completed copies display `Copied 10 -> 230`; empty sources display `Skipped 11`. A read/write failure reports the source and destination slots and stops the operation. Completed copies remain. Run SDON again after an SD write failure.
+- There is no whole-operation rollback or complete protection against power loss or card removal during writing.
+
+### Copy Example
+
+This copies internal Flash slots 10–20 to SD slots 230–240, overwriting existing destination programs.
+
+```basic
+CLS
+SDON
+SD 10,20,230
+FILES 230,240
+```
+
+The reverse command is `SD 230,240,10`; it overwrites internal Flash slots 10–20.
+
+### Hardware Validation (2026-10-27)
+
+Both RP2040 revision 16117 and RP2350 revision 16132 passed builds, version checks, and basic program copying. Additional checks passed: copying while SDOFF returns an error and retains the destination; invalid ranges stop before writing; Flash-to-Flash and SD-to-SD are rejected; empty sources are skipped while retaining destinations; and the RAM program and FILE() remain unchanged on success and error. These results do not establish protection against forced faults such as power loss during writing.
+
+## BAS Export, Automatic Import, and Deletion
 
 | Command | SD behavior |
 | --- | --- |
 | `SAVE200` or `SAVE200,0` | Save `P200.IJB` in the existing 4096-byte binary format |
 | `SAVE200,1` | Save `P200.BAS` as line-numbered text matching LIST |
 | `LOAD200` / `LRUN200` | Load IJB when present; otherwise load BAS. If both exist, prefer IJB and retain both files |
-| `FILES` / `FILES200,299` | Mark BAS with `*`, IJB with a space, and duplicate slots with `! [duplicate]` |
+| `FILES` / `FILES200,299` | Mark BAS with `*`, IJB with a space, and duplicate slots with `![duplicate]` |
 
-Display examples: `200* CLS` indicates BAS, `201  CLS` indicates IJB, and `202! [duplicate]` indicates that both formats exist. LOAD/LRUN read IJB for a duplicate slot and retain both files.
+Each row contains the slot number, one format marker, and the first source line, with no extra space after the marker. Examples: `200*CLS` indicates BAS, `201 CLS` indicates IJB, and `202![duplicate]` indicates that both formats exist. The IJB marker is one space. This restores one character of preview width. LOAD/LRUN read IJB for a duplicate slot and retain both files.
 
 Slots remain 200–299. The optional second SAVE argument accepts only 0 (binary, default) or 1 (text). Text mode is not supported for internal Flash or EEPROM slots.
 
@@ -313,7 +394,7 @@ RAM is replaced only after successful reading, conversion, and validation. If bo
 
 Writes and deletions retain sector read-back verification and FAT mirror updates. After a write failure, run SDON again. Power loss may still damage files or filesystem metadata. If writing or cleanup fails during a format switch, SAVE reports an error and both files may remain. Subsequent LOAD/LRUN still prefer IJB and do not delete either file. BAS supports up to 16 clusters; IJB retains its 8-cluster limit. BAS processing adds an 8KiB temporary buffer.
 
-Revision 16131 was built and functionally tested on Pico 2 / RP2350 with HSTX DVI on 2026-10-15. RP2040 SD support remains unverified.
+Revision 16131 was built and functionally tested on Pico 2 / RP2350 with HSTX DVI on 2026-10-15. RP2040 has since also passed IJB/BAS save, load and execution, PC-edited BAS import, deletion on empty SAVE, near-4K programs, repeated SDON/SDOFF, internal Flash and array regression checks, and IJB priority with both duplicate files retained.
 
 ### BAS Save and Load Example
 
@@ -339,8 +420,8 @@ The original IchigoJam BASIC version remains **1.6.1**. The final two digits of 
 
 | Platform | `VER()` | `VER(1)` |
 | --- | --- | --- |
-| Raspberry Pi Pico / RP2040 | `16116` | `8` |
-| Raspberry Pi Pico 2 / RP2350 | `16131` | `9` |
+| Raspberry Pi Pico / RP2040 | `16117` | `8` |
+| Raspberry Pi Pico 2 / RP2350 | `16132` | `9` |
 
 Example for Pico 2:
 
@@ -350,7 +431,7 @@ CLS
 ? VER(1)
 ```
 
-Expected output: `16131`, then `9`.
+Expected output on Pico 2: `16132`, then `9`. On Pico / RP2040: `16117`, then `8`.
 
 ---
 
@@ -359,10 +440,14 @@ Expected output: `16131`, then `9`.
 The library versions and PicoDVI setup in this section apply to the RP2040 build. For Pico 2 / RP2350, use the separate instructions below.
 
 Create the build environment inside the `IchigoJam_P` directory.
+
 ### Required tools
+
 - CMake
 - GCC
+
 ### Required libraries
+
 Place the following under the `IchigoJam_P` directory:
 - `IchigoJam_BASIC`
   - Copy the `IchigoJam_BASIC` directory from one level above
@@ -379,12 +464,14 @@ Place the following under the `IchigoJam_P` directory:
 - `PicoDVI`
   - Repository: `https://github.com/mlorenzati/PicoDVI.git`
   - Use commit `579eecc`
+
 ### Environment variables
 ```sh
-PICO_SDK_PATH=foo/IchigoJam_P/pico-sdk
-PICO_EXTRAS_PATH=foo/IchigoJam_P/pico-extras
+export PICO_SDK_PATH=/foo/IchigoJam_P/pico-sdk
+export PICO_EXTRAS_PATH=/foo/IchigoJam_P/pico-extras
 ```
-See the Raspberry Pi documentation for details.
+Replace `/foo/IchigoJam_P` with the absolute path to your build project. See the Raspberry Pi documentation for details.
+
 ### Build for RP2040
 
 Run the following commands from the repository root.
@@ -393,19 +480,28 @@ Run the following commands from the repository root.
 cd IchigoJam_P
 mkdir build
 cd build
-cmake ..
-make
+cmake .. \
+  -DPICO_BOARD=pico \
+  -DPICO_PLATFORM=rp2040 \
+  -DPICO_SDK_PATH=/foo/IchigoJam_P/pico-sdk \
+  -DPICO_EXTRAS_PATH=/foo/IchigoJam_P/pico-extras
+cmake --build . -j 8
 ```
 When `IchigoJam_P.uf2` is generated, write it to the Raspberry Pi Pico.
+
 ## If Something Goes Wrong
+
 Try deleting the `build` directory and rebuilding from scratch.
 This is especially effective when video output becomes unstable.
+
 ## Files to Overwrite for the 4K Version
-Copy the following files from the `GivetakeJam_P` directory into the corresponding `IchigoJam_P` directories:
+
+Apply the following files to their corresponding locations in the build project. Keep the repository-level `IchigoJam_BASIC` directory synchronized with `IchigoJam_P/IchigoJam_BASIC`:
 - `IchigoJam_BASIC`
   - `basic.h`
   - `ram.h`
   - `tokens_v1.5.h`
+  - `command_sd_copy.h` (SD copy command with Japanese comments)
 - `src`
   - `config.h`
   - `i2ceeprom.h`
@@ -416,6 +512,7 @@ Copy the following files from the `GivetakeJam_P` directory into the correspondi
 - Root `CMakeLists.txt`: link `hardware_spi` for SD support
 
 Then build as usual. When `IchigoJam_P.uf2` is generated, write it to the Pico.
+
 ## RP2350 Build (Raspberry Pi Pico 2 / macOS)
 
 The RP2350 build uses HSTX DVI and does not use the PicoDVI library.
@@ -433,18 +530,26 @@ After a successful build, `IchigoJam_P/build-pico2/IchigoJam_P.uf2` is generated
 For distribution, the same UF2 is saved under the name `GivetakeJam_P.uf2`.
 
 ## Raspberry Pi Pico / RP2040 Firmware / Checksum
-### Write this firmware to Raspberry Pi Pico / RP2040.
-- `IchigoJam_P.uf2`
-  - `SHA-256`: `9E9B7D4D1E7E776BC3B4F8DE3DE078C1FAEA978F5BBCE3385320402F1F92B396`
-  - `MD5`: `1865CF3376720FB8050E2158087A2D16`
-  - `SHA-1`: `72C3A41A9D976858646DFE3103C6973098AAC5C8`
+
+- File: `IchigoJam_P.uf2`
+- Current revision: `16117`
+- File size: 237,568 bytes
+- SHA-256: `ECDD6B997A7A67FB84D764015803EAF8A7A7C3729F00EA9014DB28722DFA775B`
+- MD5: `3FDB4FAFD828429F4650A1B57A18B637`
+- SHA-1: `33F7440D4087ADD6DCE2635F841B932700CC825C`
+
 ## Raspberry Pi Pico 2 / RP2350 Firmware / Checksum
-- `GivetakeJam_P.uf2`
-  - SHA-256: `6D0BC0DDB71B09882E4D6BC86297E2528F68924D40326B59A61D12A265FB65C0`
-  - MD5: `4B87887BE55478240AE46C3DF3EFC583`
-  - SHA-1: `BA808F3318206145A27F1C02CA0F512DA5A6F4C0`
+
+- File: `GivetakeJam_P.uf2`
+- Current revision: `16132`
+- File size: 218,624 bytes
+- SHA-256: `7374FA5FA749414C85ACE41483286AE0C58973625C77F69ED7EB254E7F6D5A89`
+- MD5: `4A17B2328CEBEEF78D3D83676864B4AB`
+- SHA-1: `27BF73098142A8EE66BE2E849A1183FF787300A3`
+
 
 ## Test Programs
+
 - `ARRAY_VAR_TOTAL_TEST.BAS`
   - Comprehensive array-variable test
   - Verified to finish with `ALL OK`
@@ -458,18 +563,28 @@ For distribution, the same UF2 is saved under the name `GivetakeJam_P.uf2`.
   - PAL / RGB332 palette change sample for RP2350 HSTX DVI
   - Use cursor keys to select a color number and adjust its RGB332 palette value.
   - `R` restores the default firmware palette with `PAL RESET`.
+
 ## Screenshots
+
 ### Runtime Environment
+
 ![Runtime Environment](./docs/IMG_4677up.png)
+
 ### Display Examples
+
 ![Display Examples](./docs/IMG_4679up.png)
+
 ### IchigoJam_P Compatible Board ( GivetakeJam-P )
+
 ![Compatible Board](./docs/IMG_4684up.png)
+
 ### COLOR Command used game ( ICHIGO EATER COLOR )
+
 ![BASIC Game](./docs/IMG_4685up.png)
 ![BASIC Game](./docs/IMG_4690up.png)
 
 ### PAL RGB332 change sample
+
 ![PAL RGB332 Change](./docs/IMG_4984up.png)
 
 `PAL_RGB332_CHANGE.BAS` is a sample program for checking and adjusting the RP2350 HSTX DVI RGB332 palette.
@@ -479,9 +594,11 @@ Use the cursor keys to select a color number and change the palette value.
 Press `R` to restore the default firmware palette with `PAL RESET`.
 
 ### SD Card Expansion Board Circuit
+
 ![SD card expander PCB](./docs/MSD_MemCard101.png)
 
 ## Known Limitations / Notes
+
 - Program size is limited to 4096 bytes
 - Internal flash storage provides 25 slots on RP2040 and 100 slots on RP2350
 - External EEPROM display range is fixed to `100..131`
@@ -504,20 +621,27 @@ Press `R` to restore the default firmware palette with `PAL RESET`.
 
 
 ## License
+
 Copyright 2014-2025 the IchigoJam authors. All rights reserved.
 MIT license.
 https://ichigojam.net/license
+
 ## Trademark
+
 - IchigoJam is a registered trademark of jig.jp Co., Ltd.
 - Raspberry Pi is a registered trademark of the Raspberry Pi Foundation.
+
 ## Terms of Use
+
 Please download after agreeing to the terms of use.
 A license is required for redistribution to third parties.
 - Terms of use: https://pcn.club/sp/ijp/
 - IchigoJam Royalty-Free Program License: https://ichigojam.net/ichigojam-license.pdf
 ---
 Givetakewinwin
+
 ## Change Log
+
 - Created: 2026-05-29
 - Updated on 2026-07-18 for Raspberry Pi Pico 2 / RP2350 HSTX DVI support.
 - Updated on 2026-07-29 for Raspberry Pi Pico 2 / Array variables 1125.
@@ -530,3 +654,4 @@ Givetakewinwin
 - Updated on 2026-10-11: Added `SDON` and `SDOFF` for program storage on SD cards.
 - Updated on 2026-10-11, revision 16130: Changed CS to IN3 / GP6 with direct active-LOW control and a 10kΩ pull-up.
 - 2026-10-15, revision 16131: Added BAS export/import, single-file-per-slot format replacement, deletion on empty SAVE, FILES format marks, and IJB-priority loading for duplicate slots. Built and hardware-tested on RP2350.
+- 2026-10-27, RP2040 revision 16117 / RP2350 revision 16132: Added SD program copying between Flash and SD, the COL alias, and FILES rows without an extra space after the format marker. Both boards passed builds, version checks, basic copying, rejection of invalid requests before writing, empty-source skipping, and RAM/FILE() retention checks.
